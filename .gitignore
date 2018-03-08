@@ -52,3 +52,9 @@ Mkfile.old
 dkms.conf
 
 *.txt
+
+.vs/
+TcpIpNetworkPrograming.sln
+TcpIpNetworkPrograming.vcxproj
+TcpIpNetworkPrograming.vcxproj.filters
+include/
