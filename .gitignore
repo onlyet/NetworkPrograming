@@ -58,3 +58,4 @@ TcpIpNetworkPrograming.sln
 TcpIpNetworkPrograming.vcxproj
 TcpIpNetworkPrograming.vcxproj.filters
 include/
+*.vcxproj.user
