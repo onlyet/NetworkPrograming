@@ -54,9 +54,10 @@ dkms.conf
 *.txt
 
 .vs/
-TcpIpSocketPrograming.sln
-TcpIpSocketPrograming.vcxproj
-TcpIpSocketPrograming.vcxproj.filters
+*.sln
+*.vcxproj
+*.vcxproj.filters
 include/
 *.vcxproj.user
 core.*
+
