@@ -8,7 +8,7 @@
 
 #define BUF_SIZE 30
 
-int make_blocking(int fd)
+int make_nonblocking(int fd)
 {
 	int flags;
 
@@ -44,7 +44,7 @@ int main(int argc, char *argv[])
 	adr.sin_addr.s_addr = htonl(INADDR_ANY);
 	adr.sin_port = htons(atoi(argv[1]));
 
-	if (!make_blocking(recv_sock)) {
+	if (!make_nonblocking(recv_sock)) {
 		exit(1);
 	}
 
