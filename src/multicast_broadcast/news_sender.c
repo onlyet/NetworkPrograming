@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <errno.h>
 
 #define TTL 64
 #define BUF_SIZE 30
@@ -34,8 +35,17 @@ int main(int argc, char *argv[])
 
 	while (!feof(fp))
 	{
+		printf("sendto..\n");
 		fgets(buf, BUF_SIZE, fp);
-		sendto(send_sock, buf, strlen(buf), 0, (struct sockaddr*)&mul_adr, sizeof(mul_adr));
+		int ret = sendto(send_sock, buf, strlen(buf), 0, (struct sockaddr*)&mul_adr, sizeof(mul_adr));
+		if(ret < 0){
+		    printf("ret = %d\n", ret);
+		    printf("%s\n", strerror(errno));
+		    exit(1);
+		}		
+		else{
+		    printf("buf = %s", buf);
+		}
 		sleep(2);
 	}
 	fclose(fp);
@@ -46,6 +56,6 @@ int main(int argc, char *argv[])
 void error_handling(char *message)
 {
 	fputs(message, stderr);
-	fputs('\n', stderr);
+	fputc('\n', stderr);
 	exit(1);
 }
