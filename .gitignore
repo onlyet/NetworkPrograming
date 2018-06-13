@@ -60,4 +60,6 @@ dkms.conf
 include/
 *.vcxproj.user
 core.*
+Debug/
+Release/
 
