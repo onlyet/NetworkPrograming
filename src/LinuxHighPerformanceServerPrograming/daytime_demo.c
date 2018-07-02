@@ -5,6 +5,9 @@
 #include <unistd.h>
 #include <assert.h>
 
+#include <errno.h>
+#include <string.h>
+
 int main(int argc, char *argv[])
 {
 	assert(argc == 2);
@@ -21,10 +24,14 @@ int main(int argc, char *argv[])
 	address.sin_family = AF_INET;
 	address.sin_port = servinfo->s_port;
 	/*因为h_addr_list本身是网络字节序，不需要转换字节序*/
-	address.sin_addr = *(struct in_addr*)*hostinfo->h_addr_list;
+	address.sin_addr = *(struct in_addr*)(*hostinfo->h_addr_list);
 
 	int sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	int result = connect(sockfd, (struct sockaddr*)&address, sizeof(address));
+	if (result) {
+		printf("errno is %d, error string: %s", errno, strerror(errno));
+		exit(1);
+	}
 	assert(result != -1);
 
 	char buffer[128];
