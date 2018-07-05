@@ -24,6 +24,7 @@ int main(int argc, char *argv[])
 
 	//splice：复制并消费，tee：只复制数据，不消费
 	//如果要讲标准输入数据拷贝到两个输出（标准输出和文件），则需要两个管道
+
 	ret = splice(STDIN_FILENO, NULL, pipefd_stdout[1], NULL, 32768, SPLICE_F_MORE | SPLICE_F_MOVE/* | SPLICE_F_NONBLOCK*/);
 	assert(ret != -1);
 	//只复制数据，不消费
