@@ -63,3 +63,8 @@ core.*
 Debug/
 Release/
 
+#ignore all files
+*
+!src/*.cpp
+!src/*.c
+!src/*.h
