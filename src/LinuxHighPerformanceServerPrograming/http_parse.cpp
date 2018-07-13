@@ -11,24 +11,25 @@
 
 #define BUFFER_SIZE 4096
 
+//主状态机的两种状态：
 enum CHECK_STATE {
-	CHECK_STATE_REQUESTLINE = 0,
-	CHECK_STATE_HEADER
+	CHECK_STATE_REQUESTLINE = 0,	//当前正在分析请求行
+	CHECK_STATE_HEADER				//当前正在分析头部字段
 };
 
 enum LINE_STATUS {
-	LINE_OK = 0,
-	LINE_BAD,
-	LINE_OPEN
+	LINE_OK = 0,					//读取到一个完整的行
+	LINE_BAD,						//行出错
+	LINE_OPEN						//行数据尚且不完整
 };
 
 enum HTTP_CODE {
-	NO_REQUEST,
-	GET_REQUEST,
-	BAD_REQUEST,
-	FORBIDDEN_REQUEST,
-	INTERNAL_ERROR,
-	CLOSED_REQUEST
+	NO_REQUEST,						//请求不完整，还需继续读取
+	GET_REQUEST,					//获得一个完整的客户请求
+	BAD_REQUEST,					//请求语法有错
+	FORBIDDEN_REQUEST,				//客户没有权限访问资源
+	INTERNAL_ERROR,					//服务器内部出错
+	CLOSED_REQUEST					//客户已经关闭连接了
 };
 
 static const char *szret[] = { "I get a correct result\n", "Something wrong\n" };
@@ -39,9 +40,11 @@ LINE_STATUS parse_line(char* buffer, int& checked_index, int& read_index)
 	for (; checked_index < read_index; ++checked_index) {
 		temp = buffer[checked_index];
 		if (temp = '\r') {
+			//如果字符'\r'碰巧是buffer中最后一个读入的数据，则这次分析没有读取到一个完整的行
 			if ((checked_index + 1) == read_index) {
 				return LINE_OPEN;
 			}
+			//成功的读取到一个完整的行
 			else if (buffer[checked_index + 1] == '\n') {
 				buffer[checked_index++] = '\0';
 				buffer[checked_index++] = '\0';
@@ -58,18 +61,22 @@ LINE_STATUS parse_line(char* buffer, int& checked_index, int& read_index)
 			return LINE_BAD;
 		}
 	}
+	//所有内容都分析完毕也没遇到'\r'和'\n',则表示还需要继续读取客户数据才能进一步分析
 	return LINE_OPEN;
 }
 
 HTTP_CODE parse_requestline(char* temp, CHECK_STATE& checkstate)
 {
-	char *url = strpbrk(temp, "\t");
+	//返回" \t"中的字符第一次出现的位置
+	char *url = strpbrk(temp, " \t");
+	//如果请求行中没有空白字符或'\t'字符，则HTTP请求有问题
 	if (!url) {
 		return BAD_REQUEST;
 	}
 	*url++ = '\0';
 
 	char *method = temp;
+	//判断两字符串是否相同，忽略大小写
 	if (strcasecmp(method, "GET") == 0) {
 		printf("The request method is GET\n");
 	}
@@ -77,13 +84,13 @@ HTTP_CODE parse_requestline(char* temp, CHECK_STATE& checkstate)
 		return BAD_REQUEST;
 	}
 
-	url += strspn(url, "\t");
-	char *version = strpbrk(url, "\t");
+	url += strspn(url, " \t");
+	char *version = strpbrk(url, " \t");
 	if (!version) {
 		return BAD_REQUEST;
 	}
 	*version++ = '\0';
-	version += strspn(version, "\t");
+	version += strspn(version, " \t");
 	if (strcasecmp(version, "HTTP/1.1") != 0) {
 		return BAD_REQUEST;
 	}
@@ -106,7 +113,7 @@ HTTP_CODE parse_headers(char *temp)
 	}
 	else if (strncasecmp(temp, "Host:", 5) == 0) {
 		temp += 5;
-		temp += strspn(temp, "\t");
+		temp += strspn(temp, " \t");
 		printf("the request host is: %s\n", temp);
 	}
 	else {
