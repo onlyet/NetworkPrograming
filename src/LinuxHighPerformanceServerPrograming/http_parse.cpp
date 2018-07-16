@@ -84,6 +84,8 @@ HTTP_CODE parse_requestline(char* temp, CHECK_STATE& checkstate)
 		return BAD_REQUEST;
 	}
 
+	//返回url匹配" \t"中的字符长度，直到不匹配为止
+	//也就是如果第一个字符不匹配，返回0，不管后面的字符是否匹配
 	url += strspn(url, " \t");
 	char *version = strpbrk(url, " \t");
 	if (!version) {
@@ -96,6 +98,7 @@ HTTP_CODE parse_requestline(char* temp, CHECK_STATE& checkstate)
 	}
 	if (strncasecmp(url, "http://", 7) == 0) {
 		url += 7;
+		//返回字符‘/’第一次出现的位置
 		url = strchr(url, '/');
 	}
 	if (!url || url[0] != '/') {
