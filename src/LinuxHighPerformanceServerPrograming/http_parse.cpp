@@ -34,12 +34,13 @@ enum HTTP_CODE {
 
 static const char *szret[] = { "I get a correct result\n", "Something wrong\n" };
 
+//解析请求行和头部要保证读到一个完整的行
 LINE_STATUS parse_line(char* buffer, int& checked_index, int& read_index)
 {
 	char temp;
 	for (; checked_index < read_index; ++checked_index) {
 		temp = buffer[checked_index];
-		if (temp = '\r') {
+		if (temp == '\r') {
 			//如果字符'\r'碰巧是buffer中最后一个读入的数据，则这次分析没有读取到一个完整的行
 			if ((checked_index + 1) == read_index) {
 				return LINE_OPEN;
@@ -58,10 +59,10 @@ LINE_STATUS parse_line(char* buffer, int& checked_index, int& read_index)
 				buffer[checked_index++] = '\0';
 				return LINE_OK;
 			}
-			return LINE_BAD;
 		}
+			//return LINE_BAD;
 	}
-	//所有内容都分析完毕也没遇到'\r'和'\n',则表示还需要继续读取客户数据才能进一步分析
+	//此时buffer中所有内容都分析完毕，并且没遇到'\r'和'\n',这表示还需要继续读取客户数据才能进一步分析
 	return LINE_OPEN;
 }
 
@@ -86,13 +87,13 @@ HTTP_CODE parse_requestline(char* temp, CHECK_STATE& checkstate)
 
 	//返回url匹配" \t"中的字符长度，直到不匹配为止
 	//也就是如果第一个字符不匹配，返回0，不管后面的字符是否匹配
-	url += strspn(url, " \t");
+	url += strspn(url, " \t"); // 保证url第一个字符不是' '或'\t'，因为请求的url中可能会有连续的空格或制表符，如果有则return error
 	char *version = strpbrk(url, " \t");
 	if (!version) {
 		return BAD_REQUEST;
 	}
 	*version++ = '\0';
-	version += strspn(version, " \t");
+	version += strspn(version, " \t"); //跳过空格和制表符
 	if (strcasecmp(version, "HTTP/1.1") != 0) {
 		return BAD_REQUEST;
 	}
@@ -111,12 +112,13 @@ HTTP_CODE parse_requestline(char* temp, CHECK_STATE& checkstate)
 
 HTTP_CODE parse_headers(char *temp)
 {
+	//读到空行了，表示头部结束，parse_line的时候将'\r'和'\n'赋值为'\0'了
 	if (temp[0] == '\0') {
 		return GET_REQUEST;
 	}
 	else if (strncasecmp(temp, "Host:", 5) == 0) {
 		temp += 5;
-		temp += strspn(temp, " \t");
+		temp += strspn(temp, " \t");	//跳过空格和制表符
 		printf("the request host is: %s\n", temp);
 	}
 	else {
@@ -130,7 +132,7 @@ HTTP_CODE parse_content(char* buffer, int& checked_index,
 {
 	LINE_STATUS linestatus = LINE_OK;
 	HTTP_CODE retcode = NO_REQUEST;
-	while ((linestatus == parse_line(buffer, checked_index, read_index)) == LINE_OK) {
+	while ((linestatus = parse_line(buffer, checked_index, read_index)) == LINE_OK) {
 		char *temp = buffer + start_line;
 		start_line = checked_index;
 		switch (checkstate)
