@@ -64,7 +64,10 @@ Debug/
 Release/
 
 #ignore all files
-*
-!src/*.cpp
-!src/*.c
-!src/*.h
+#*
+#!src/*.cpp
+#!src/*.c
+#!src/*.h
+
+*.opendb
+*.db
