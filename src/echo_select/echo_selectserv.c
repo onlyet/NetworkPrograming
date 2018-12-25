@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
 
 		if ((fd_num = select(fd_max, &cpy_reads, 0, 0, &timeout)) == -1)
 			break;
-		if (fd_num = 0)
+		if (fd_num == 0)
 			continue;
 
 		for (i = 0; i < fd_max + 1; ++i)
