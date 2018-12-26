@@ -1,4 +1,4 @@
-#include <WinSock2.h>
+ï»¿#include <WinSock2.h>
 #include <stdio.h>
 #include <string.h>
 //#include <winsock2.h>
@@ -55,12 +55,12 @@ int main(int argc, char* argv[])
 
 	while (1)
 	{
-		posInfo = WSAWaitForMultipleEvents(numofClntSock, hEventArr, FALSE, WSA_INFINITE, FALSE);	//×èÈû
+		posInfo = WSAWaitForMultipleEvents(numofClntSock, hEventArr, FALSE, WSA_INFINITE, FALSE);	//é˜»å¡ž
 		startIdx = posInfo - WSA_WAIT_EVENT_0;
 
 		for (i = startIdx; i < numofClntSock; ++i)
 		{
-			int sigEventIdx = WSAWaitForMultipleEvents(1, &hEventArr[i], TRUE, 0, FALSE);	//Á¢¼´·µ»Ø
+			int sigEventIdx = WSAWaitForMultipleEvents(1, &hEventArr[i], TRUE, 0, FALSE);	//ç«‹å³è¿”å›ž
 			if (sigEventIdx == WSA_WAIT_FAILED || sigEventIdx == WSA_WAIT_TIMEOUT)
 				continue;
 			else
