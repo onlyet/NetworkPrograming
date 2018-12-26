@@ -11,12 +11,12 @@ void ErrorHandling(char* msg);
 
 int main(int argc, char* argv[])
 {
-	WSADATA wsaData;
+	WSADATA wsaData = { 0 };
 	SOCKET hServSock, hClntSock;
 	SOCKADDR_IN servAdr, clntAdr;
 
-	SOCKET hSockArr[WSA_MAXIMUM_WAIT_EVENTS];
-	WSAEVENT hEventArr[WSA_MAXIMUM_WAIT_EVENTS];
+	SOCKET hSockArr[WSA_MAXIMUM_WAIT_EVENTS] = { 0 };
+	WSAEVENT hEventArr[WSA_MAXIMUM_WAIT_EVENTS] = { 0 };
 	WSAEVENT newEvent;
 	WSANETWORKEVENTS netEvents;
 
@@ -24,7 +24,7 @@ int main(int argc, char* argv[])
 	int strLen, i;
 	int posInfo, startIdx;
 	int clntAdrLen;
-	char msg[BUF_SIZE];
+	char msg[BUF_SIZE] = { 0 };
 
 	if (argc != 2) {
 		printf("Usage: %s <port>\n", argv[0]);
@@ -77,11 +77,12 @@ int main(int argc, char* argv[])
 					clntAdrLen = sizeof(clntAdr);
 					hClntSock = accept(hSockArr[sigEventIdx], (SOCKADDR*)&clntAdr, &clntAdrLen);
 					newEvent = WSACreateEvent();
+					if (WSAEventSelect(hClntSock, newEvent, FD_READ | FD_WRITE | FD_CLOSE) == SOCKET_ERROR)
+						ErrorHandling("WSAEventSelect erorr");
 					hSockArr[numofClntSock] = hClntSock;
 					hEventArr[numofClntSock] = newEvent;
 					++numofClntSock;
-					//puts("connected new client fd:%d", hClntSock);
-					printf("connected new cliend fd:%d", hClntSock);
+					printf("connected new cliend fd:%d\n", hClntSock);
 				}
 				if (netEvents.lNetworkEvents & FD_READ)
 				{
@@ -90,7 +91,9 @@ int main(int argc, char* argv[])
 						puts("read error");
 						break;
 					}
-					strLen = recv(hSockArr[sigEventIdx], msg, BUF_SIZE, 0);
+					memset(msg, 0, BUF_SIZE);
+					strLen = recv(hSockArr[sigEventIdx], msg, BUF_SIZE - 1, 0);
+					printf("recv fd:%d, msg:%s\n", hSockArr[sigEventIdx], msg);
 					send(hSockArr[sigEventIdx], msg, strLen, 0);
 				}
 				if (netEvents.lNetworkEvents & FD_CLOSE)
