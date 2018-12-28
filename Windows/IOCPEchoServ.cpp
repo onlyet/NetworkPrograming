@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <process.h>
 #include <WinSock2.h>
-#include <Windows.h>
+//#include <Windows.h>
 
 #define BUF_SIZE 100
 #define READ 3
@@ -103,6 +103,7 @@ unsigned WINAPI EchoThreadMain(void * pComPort)
 	while (1)
 	{
 		//从完成端口取出一个IO完成包
+		//为了使用其它字段，将OVERLAPPED结构与其它字段封装在一个结构体，然后传递结构体首地址（也是第一个成员OVERLAPPED的地址）
 		GetQueuedCompletionStatus(comPort, &bytesTrans, (LPDWORD)&handleInfo, (LPOVERLAPPED*)&ioInfo, INFINITE);
 		sock = handleInfo->hClntSock;
 		if (ioInfo->rwMode == READ)
@@ -122,7 +123,7 @@ unsigned WINAPI EchoThreadMain(void * pComPort)
 			WSASend(sock, &ioInfo->wsaBuf, 1, NULL, 0, &ioInfo->overlapped, NULL);
 
 			ioInfo = (LPPER_IO_DATA)malloc(sizeof(PER_IO_DATA));
-			memset(&ioInfo, 0, sizeof(PER_IO_DATA));
+			memset(ioInfo, 0, sizeof(PER_IO_DATA));
 			ioInfo->wsaBuf.len = BUF_SIZE;
 			ioInfo->wsaBuf.buf = ioInfo->buffer;
 			ioInfo->rwMode = READ;
