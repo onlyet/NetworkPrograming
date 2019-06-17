@@ -1,0 +1,4 @@
+
+void demoEntry();
+
+void judgeEndian();
