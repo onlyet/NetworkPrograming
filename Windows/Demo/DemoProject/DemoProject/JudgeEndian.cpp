@@ -29,14 +29,40 @@ int judgeEndian()
 
 unsigned long Htonl(unsigned long n)
 {
-    int ret = judgeEndian();
-    assert(ret != -1);
-    if (ret == 1)   //Ğ¡¶Ë
+    int ret = 0;
+    int endian = judgeEndian();
+    assert(endian != -1);
+    if (endian == 0)   //Ğ¡¶Ë
     {
-
+        ret = (n & 0x000000FF) << 24;
+        ret |= (n & 0x0000FF00) << 8;
+        ret |= (n & 0x00FF0000) >> 8;
+        ret |= (n & 0xFF000000) >> 24;
+        return ret;
     }
-    else
+    return n;
+}
+
+unsigned long Ntohl(unsigned long n)
+{
+    int ret = 0;
+    int endian = judgeEndian();
+    assert(endian != -1);
+    if (endian == 0)   //Ğ¡¶Ë
     {
-
+        ret = (n & 0x000000FF) << 24;
+        ret |= (n & 0x0000FF00) << 8;
+        ret |= (n & 0x00FF0000) >> 8;
+        ret |= (n & 0xFF000000) >> 24;
+        return ret;
     }
+    return n;
+}
+
+void endianTest()
+{
+    unsigned long n = 0x12345678;
+    cout << hex << "n = " << n << endl;
+    cout << "htonl, n = " << Htonl(n) << endl;
+    cout << "ntohl, n = " << Ntohl(Htonl(n)) << endl;
 }

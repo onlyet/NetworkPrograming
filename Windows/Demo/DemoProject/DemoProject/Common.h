@@ -1,4 +1,4 @@
 
 void demoEntry();
 
-void judgeEndian();
+void endianTest();
