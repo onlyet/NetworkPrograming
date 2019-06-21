@@ -1,5 +1,8 @@
 #include "Common.h"
 #include <WinSock2.h>
+#include <iostream>
+
+using namespace std;
 
 //×èÈûconnect
 void nonblockingConnect()
@@ -24,7 +27,7 @@ void nonblockingConnect()
 
 
 //·Ç×èÈûconnect
-void nonblockingConnect()
+bool nonblockingConnect(const char* ip, short port, int timeout = 3)
 {
     SOCKET sock;
     SOCKADDR_IN srvAddr;
@@ -34,18 +37,28 @@ void nonblockingConnect()
     srvAddr.sin_family = AF_INET;
 
     int ret = connect(sock, (PSOCKADDR)&srvAddr, sizeof(SOCKADDR_IN));
-    if (0 == ret)
+    if (ret == 0)
     {
-        //³É¹¦
+        cout << "connect success" << endl;
+        return true;
     }
-    else if (SOCKET_ERROR == ret)
+    else if (ret == SOCKET_ERROR || WSAGetLastError() != WSAEWOULDBLOCK)
     {
-        int err = WSAGetLastError();
-        if (WSAEWOULDBLOCK == err)
-        {
-            fd_set wfds;
-            
-            select(sock + 1, )
-        }
+        cout << "can not connect to server";
+        return false;
     }
+
+    fd_set wfds;
+    FD_ZERO(&wfds);
+    FD_SET(sock, &wfds);
+    timeval tv{ timeout, 0 };
+
+    ret = select(sock + 1, nullptr, &wfds, nullptr, &tv);
+    if (ret != 1)
+    {
+        cout << "can not connect to server";
+        return false;
+    }
+    cout << "connect success" << endl;
+    return true;
 }
