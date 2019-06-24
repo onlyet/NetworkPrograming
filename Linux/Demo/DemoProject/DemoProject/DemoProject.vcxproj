@@ -67,6 +67,7 @@
     <IncludePath>$(PUBLIC)\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemGroup>
+    <ClCompile Include="nbc.cpp" />
     <ClCompile Include="nonBlockingConnect.cpp" />
   </ItemGroup>
   <ItemDefinitionGroup />
