@@ -70,30 +70,45 @@ bool nonblockingConnect(const char* ip, short port, int timeout = 3)
 
 	struct sockaddr_in srvAddr;
 	memset(&srvAddr, 0, sizeof(struct sockaddr_in));
-	//srvAddr.sin_addr.s_addr = htonl(atoi(ip));
 	srvAddr.sin_addr.s_addr = inet_addr(ip);
 	srvAddr.sin_port = htons(port);
 	srvAddr.sin_family = AF_INET;
 
-	int ret = connect(fd, (sockaddr*)&srvAddr, sizeof(struct sockaddr_in));
-	if (ret == 0)
-	{
-		cout << "connect successfully" << endl;
-		return true;
-	}
-	else if (ret == -1 && errno != EINPROGRESS && errno != EINTR)
-	{
-        cout << "can not connect to server, errno: " << errno << endl;
-		close(fd);
-		return false;
-	}
+    //为了处理EINTR,将connect放在循环内
+    while (1)
+    {
+        int ret = connect(fd, (sockaddr*)&srvAddr, sizeof(struct sockaddr_in));
+        if (ret == 0)
+        {
+            cout << "connect successfully" << endl;
+            return true;
+        }
+        else if (ret == -1)
+        {
+            if (errno == EINTR)
+            {
+                cout << "signal interrupt" << endl;
+                continue;
+            }
+            else if (errno != EINPROGRESS)
+            {
+                cout << "can not connect to server, errno: " << errno << endl;
+                close(fd);
+                return false;
+            }
+            else
+            {
+                break;
+            }
+        }
+    }
 
 	fd_set wfds;
     FD_ZERO(&wfds);
     FD_SET(fd, &wfds);
 	timeval tv = { timeout, 0 };
 
-	ret = select(fd + 1, nullptr, &wfds, nullptr, &tv);
+	int ret = select(fd + 1, nullptr, &wfds, nullptr, &tv);
 	if (ret <= 0)
 	{
 		cout << "can not connect to server" << endl;
@@ -106,32 +121,35 @@ bool nonblockingConnect(const char* ip, short port, int timeout = 3)
 		int error;
 		socklen_t error_len = sizeof(int);
 		ret = getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &error_len);
-		if (ret == -1)
+		if (ret == -1 || error != 0)
 		{
-			cout << "getsockopt failed" << endl;
+			cout << "getsockopt connect failed, errno: " << errno << endl;
 			return false;
 		}
-		if (error == 0)
-		{
-			cout << "connect successfully" << endl;
 
-			while (1)
-			{
-				int send_len = 0;
-				const char buf[] = "hello\n";
+        /**
+        * 在linux下，select返回fd可写，有两种情况：1.连接成功，2.发生错误
+        * getsockopt返回error为0则排除错误情况，连接已建立
+        */
+        cout << "connect successfully" << endl;
 
-				if ((send_len = send(fd, buf, sizeof(buf), 0)) == -1)
-				{
-					cout << "send failed";
-					return false;
-				}
-				cout << "send len: " << send_len << endl;
-				sleep(3);
-			}
+        //测试代码，循环发送
+        while (1)
+        {
+            int send_len = 0;
+            const char buf[] = "hello\n";
 
-			return true;
-		}
-	}
+            if ((send_len = send(fd, buf, sizeof(buf), 0)) == -1)
+            {
+                cout << "send failed";
+                return false;
+            }
+            cout << "send len: " << send_len << endl;
+            sleep(3);
+        }
+
+        return true;
+    }
 
     cout << "can not connect to server, errno: " << errno << endl;
 	close(fd);
@@ -160,32 +178,47 @@ bool nonblockingConnect_v2(const char* ip, short port, int timeout = 3)
 
 	struct sockaddr_in srvAddr;
 	memset(&srvAddr, 0, sizeof(struct sockaddr_in));
-	//srvAddr.sin_addr.s_addr = htonl(atoi(ip));
 	srvAddr.sin_addr.s_addr = inet_addr(ip);
 	srvAddr.sin_port = htons(port);
 	srvAddr.sin_family = AF_INET;
 
-	int ret = connect(fd, (sockaddr*)&srvAddr, sizeof(struct sockaddr_in));
-	if (ret == 0)
-	{
-		cout << "connect successfully" << endl;
-		return true;
-	}
-	else if (ret == -1 && errno != EINPROGRESS)
-	{
-		cout << "can not connect to server, errno: " << errno << endl;
-		close(fd);
-		return false;
-	}
+    while (1)
+    {
+        int ret = connect(fd, (sockaddr*)&srvAddr, sizeof(struct sockaddr_in));
+        if (ret == 0)
+        {
+            cout << "connect successfully" << endl;
+            return true;
+        }
+        else if (ret == -1)
+        {
+            if (errno == EINTR)
+            {
+                cout << "signal interrupt" << endl;
+                continue;
+            }
+            else if (errno != EINPROGRESS)
+            {
+                cout << "can not connect to server, errno: " << errno << endl;
+                close(fd);
+                return false;
+            }
+            else
+            {
+                break;
+            }
+        }
+    }
 
 	fd_set wfds;
 	FD_ZERO(&wfds);
 	FD_SET(fd, &wfds);
 	timeval tv = { timeout, 0 };
 
+    //循环select直到EISCONN，实际使用应设置超时
 	while (1)
 	{
-		ret = select(fd + 1, nullptr, &wfds, nullptr, &tv);
+		int ret = select(fd + 1, nullptr, &wfds, nullptr, &tv);
 		if (ret <= 0)
 		{
 			cout << "can not connect to server" << endl;
@@ -195,25 +228,26 @@ bool nonblockingConnect_v2(const char* ip, short port, int timeout = 3)
 
 		if (FD_ISSET(fd, &wfds))
 		{
-			//重新connect，如果EISCONN则表明连接已建立
+			//重新connect，如果errno==EISCONN则表明连接已建立
 			ret = connect(fd, (sockaddr*)&srvAddr, sizeof(sockaddr_in));
 			if (errno == EISCONN)
 			{
 				cout << "connect successfully" << endl;
 
-				while (1)
-				{
-					int send_len = 0;
-					const char buf[] = "hello\n";
+                //测试代码，循环发送
+                while (1)
+                {
+                    int send_len = 0;
+                    const char buf[] = "hello\n";
 
-					if ((send_len = send(fd, buf, sizeof(buf), 0)) == -1)
-					{
-						cout << "send failed";
-						return false;
-					}
-					cout << "send len: " << send_len << endl;
-					sleep(3);
-				}
+                    if ((send_len = send(fd, buf, sizeof(buf), 0)) == -1)
+                    {
+                        cout << "send failed";
+                        return false;
+                    }
+                    cout << "send len: " << send_len << endl;
+                    sleep(3);
+                }
 
 				return true;
 			}
@@ -253,29 +287,45 @@ bool nonblockingConnect_v3(const char* ip, short port, int timeout = 3)
 	srvAddr.sin_port = htons(port);
 	srvAddr.sin_family = AF_INET;
 
-	int ret = connect(fd, (sockaddr*)&srvAddr, sizeof(struct sockaddr_in));
-	if (ret == 0)
-	{
-		cout << "connect successfully" << endl;
-		return true;
-	}
-	else if (ret == -1 && errno != EINPROGRESS && errno != EINTR)
-	{
-		cout << "can not connect to server, errno: " << errno << endl;
-		close(fd);
-		return false;
-	}
+    while (1)
+    {
+        int ret = connect(fd, (sockaddr*)&srvAddr, sizeof(struct sockaddr_in));
+        if (ret == 0)
+        {
+            cout << "connect successfully" << endl;
+            return true;
+        }
+        else if (ret == -1)
+        {
+            if (errno == EINTR)
+            {
+                cout << "signal interrupt" << endl;
+                continue;
+            }
+            else if (errno != EINPROGRESS)
+            {
+                cout << "can not connect to server, errno: " << errno << endl;
+                close(fd);
+                return false;
+            }
+            else
+            {
+                break;
+            }
+        }
+    }
 
 	struct pollfd pfd;
 	pfd.fd = fd;
 	pfd.events = POLLOUT | POLLERR;
 
-	ret = poll(&pfd, 1, timeout * 1000);
+	int ret = poll(&pfd, 1, timeout * 1000);
 	if (ret == 1 && pfd.revents == POLLOUT)
 	{
 		cout << "connect successfully" << endl;
 
-		while (1)
+        //测试代码，循环发送
+        while (1)
 		{
 			int send_len = 0;
 			const char buf[] = "hello\n";
@@ -287,7 +337,7 @@ bool nonblockingConnect_v3(const char* ip, short port, int timeout = 3)
 			}
 			cout << "send len: " << send_len << endl;
 			sleep(3);
-		}
+		} 
 
 		return true;
 	}
