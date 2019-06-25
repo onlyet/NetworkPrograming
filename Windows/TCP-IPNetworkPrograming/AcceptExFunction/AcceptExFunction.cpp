@@ -40,23 +40,25 @@ int main()
 
 	// Initialize Winsock
 	iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
-	if (iResult != NO_ERROR) {
+	if (iResult != NO_ERROR) 
+    {
 		wprintf(L"Error at WSAStartup\n");
 		return 1;
 	}
 
 	// Create a handle for the completion port
 	hCompPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, (u_long)0, 0);
-	if (hCompPort == NULL) {
-		wprintf(L"CreateIoCompletionPort failed with error: %u\n",
-			GetLastError());
+	if (hCompPort == NULL) 
+    {
+		wprintf(L"CreateIoCompletionPort failed with error: %u\n", GetLastError());
 		WSACleanup();
 		return 1;
 	}
 
 	// Create a listening socket
 	ListenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (ListenSocket == INVALID_SOCKET) {
+	if (ListenSocket == INVALID_SOCKET) 
+    {
 		wprintf(L"Create of ListenSocket socket failed with error: %u\n",
 			WSAGetLastError());
 		WSACleanup();
@@ -77,7 +79,8 @@ int main()
 	service.sin_addr.s_addr = inet_addr(ip);
 	service.sin_port = htons(port);
 
-	if (bind(ListenSocket, (SOCKADDR *)& service, sizeof(service)) == SOCKET_ERROR) {
+	if (bind(ListenSocket, (SOCKADDR *)&service, sizeof(service)) == SOCKET_ERROR) 
+    {
 		wprintf(L"bind failed with error: %u\n", WSAGetLastError());
 		closesocket(ListenSocket);
 		WSACleanup();
@@ -87,14 +90,16 @@ int main()
 	//----------------------------------------
 	// Start listening on the listening socket
 	iResult = listen(ListenSocket, 100);
-	if (iResult == SOCKET_ERROR) {
+	if (iResult == SOCKET_ERROR) 
+    {
 		wprintf(L"listen failed with error: %u\n", WSAGetLastError());
 		closesocket(ListenSocket);
 		WSACleanup();
 		return 1;
 	}
 
-	wprintf(L"Listening on address: %s:%d\n", ip, port);
+	//wprintf(L"Listening on address: %s:%d\n", ip, port);
+    printf("Listening on address: %s:%d\n", ip, port);
 
 	// Load the AcceptEx function into memory using WSAIoctl.
 	// The WSAIoctl function is an extension of the ioctlsocket()
@@ -107,7 +112,8 @@ int main()
 		&GuidAcceptEx, sizeof(GuidAcceptEx),
 		&lpfnAcceptEx, sizeof(lpfnAcceptEx),
 		&dwBytes, NULL, NULL);
-	if (iResult == SOCKET_ERROR) {
+	if (iResult == SOCKET_ERROR) 
+    {
 		wprintf(L"WSAIoctl failed with error: %u\n", WSAGetLastError());
 		closesocket(ListenSocket);
 		WSACleanup();
@@ -116,7 +122,8 @@ int main()
 
 	// Create an accepting socket
 	AcceptSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (AcceptSocket == INVALID_SOCKET) {
+	if (AcceptSocket == INVALID_SOCKET)
+    {
 		wprintf(L"Create accept socket failed with error: %u\n", WSAGetLastError());
 		closesocket(ListenSocket);
 		WSACleanup();
@@ -130,18 +137,23 @@ int main()
 		outBufLen - ((sizeof(sockaddr_in) + 16) * 2),
 		sizeof(sockaddr_in) + 16, sizeof(sockaddr_in) + 16,
 		&dwBytes, &olOverlap);
-	if (bRetVal == FALSE) {
-		wprintf(L"AcceptEx failed with error: %u\n", WSAGetLastError());
-		closesocket(AcceptSocket);
-		closesocket(ListenSocket);
-		WSACleanup();
-		return 1;
+	if (bRetVal == FALSE) 
+    {
+        if (WSAGetLastError() != WSA_IO_PENDING)
+        {
+            wprintf(L"AcceptEx failed with error: %u\n", WSAGetLastError());
+            closesocket(AcceptSocket);
+            closesocket(ListenSocket);
+            WSACleanup();
+            return 1;
+        }
 	}
 
 	// Associate the accept socket with the completion port
 	hCompPort2 = CreateIoCompletionPort((HANDLE)AcceptSocket, hCompPort, (u_long)0, 0);
 	// hCompPort2 should be hCompPort if this succeeds
-	if (hCompPort2 == NULL) {
+	if (hCompPort2 == NULL)
+    {
 		wprintf(L"CreateIoCompletionPort associate failed with error: %u\n",
 			GetLastError());
 		closesocket(AcceptSocket);

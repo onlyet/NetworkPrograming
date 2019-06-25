@@ -4,9 +4,13 @@
 #include <WinSock2.h>
 #include <MSWSock.h>
 
+#pragma comment(lib, "Ws2_32.lib")
+
 #define BUF_SIZE 100
 #define READ 3
 #define WRITE 5
+
+const char port[] = "5000";
 
 typedef struct
 {
@@ -69,10 +73,11 @@ int main(int argc, char* argv[])
 	ZeroMemory(&listenHandleInfo->m_addr, sizeof(SOCKADDR));
 	listenHandleInfo->m_addr.sin_family = AF_INET;
 	listenHandleInfo->m_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-	listenHandleInfo->m_addr.sin_port = htons(atoi(argv[1]));
+	listenHandleInfo->m_addr.sin_port = htons(atoi(port));
 
 	if (bind(listenHandleInfo->m_sock, (SOCKADDR*)&listenHandleInfo->m_addr, sizeof(SOCKADDR)) == SOCKET_ERROR)
 		ErrorHandling("bind error");
+
 	if (listen(listenHandleInfo->m_sock, 5) == SOCKET_ERROR)
 		ErrorHandling("listen error");
 
@@ -93,8 +98,6 @@ int main(int argc, char* argv[])
 		SOCKET clntSock;
 		SOCKADDR_IN clntAddr;
 		int addrLen = sizeof(clntAddr);
-
-
 
 		//listenSockÊÇ×èÈûµÄ
 		clntSock = accept(listenHandleInfo->m_sock, (SOCKADDR*)&clntAddr, &addrLen);
