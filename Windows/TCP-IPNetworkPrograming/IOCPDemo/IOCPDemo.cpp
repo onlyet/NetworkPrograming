@@ -3,6 +3,9 @@
 #include <process.h>
 #include <WinSock2.h>
 #include <MSWSock.h>
+#include <iostream>
+
+using namespace std;
 
 #pragma comment(lib, "Ws2_32.lib")
 
@@ -27,7 +30,9 @@ typedef struct
 } PER_IO_DATA, *LPPER_IO_DATA;
 
 unsigned WINAPI EchoThreadMain(void* CompletionPort);
-void ErrorHandling(char* message) {
+
+void ErrorHandling(char* message)
+{
 	fputs(message, stderr);
 	fputc('\n', stderr);
 	exit(1);
@@ -59,7 +64,7 @@ int main(int argc, char* argv[])
 	//根据CPU核数创建IO线程
 	comPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
 	GetSystemInfo(&sysInfo);
-	for (int i = 0; i < sysInfo.dwNumberOfProcessors; ++i)
+	for (DWORD i = 0; i < sysInfo.dwNumberOfProcessors; ++i)
 	{
 		_beginthreadex(NULL, 0, EchoThreadMain, comPort, 0, NULL);
 	}
@@ -70,9 +75,10 @@ int main(int argc, char* argv[])
 	//关联监听socket和完成端口
 	CreateIoCompletionPort((HANDLE)listenHandleInfo->m_sock, comPort, (ULONG_PTR)listenHandleInfo, 0);
 
-	ZeroMemory(&listenHandleInfo->m_addr, sizeof(SOCKADDR));
+	SecureZeroMemory(&listenHandleInfo->m_addr, sizeof(SOCKADDR));
 	listenHandleInfo->m_addr.sin_family = AF_INET;
-	listenHandleInfo->m_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	//listenHandleInfo->m_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	listenHandleInfo->m_addr.sin_addr.s_addr = inet_addr("0.0.0.0");
 	listenHandleInfo->m_addr.sin_port = htons(atoi(port));
 
 	if (bind(listenHandleInfo->m_sock, (SOCKADDR*)&listenHandleInfo->m_addr, sizeof(SOCKADDR)) == SOCKET_ERROR)
@@ -85,7 +91,8 @@ int main(int argc, char* argv[])
 		&GuidAcceptEx, sizeof(GuidAcceptEx),
 		&lpfnAcceptEx, sizeof(lpfnAcceptEx),
 		&dwBytes, NULL, NULL);
-	if (ret == SOCKET_ERROR) {
+	if (ret == SOCKET_ERROR) 
+    {
 		wprintf(L"WSAIoctl failed with error: %u\n", WSAGetLastError());
 		closesocket(listenHandleInfo->m_sock);
 		WSACleanup();
@@ -114,13 +121,21 @@ int main(int argc, char* argv[])
 		ioInfo->wsaBuf.len = BUF_SIZE;
 		ioInfo->rwMode = READ;
 		//ioInfo->overlapped->hEvent为空
-		WSARecv(handleInfo->m_sock, &ioInfo->wsaBuf, 1, &recvBytes, &flags, &ioInfo->overlapped, NULL);
+		int ret = WSARecv(handleInfo->m_sock, &ioInfo->wsaBuf, 1, &recvBytes, &flags, &ioInfo->overlapped, NULL);
+		if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING)
+		{
+			cout << "WSARecv failed" << endl;
+			break;
+		}
 	}
+
+	closesocket(listenHandleInfo->m_sock);
+	WSACleanup();
 	system("pause");
 	return 0;
 }
 
-unsigned WINAPI EchoThreadMain(void * pComPort)
+unsigned WINAPI EchoThreadMain(void* pComPort)
 {
 	HANDLE comPort = (HANDLE)pComPort;
 	SOCKET sock;
@@ -137,7 +152,11 @@ unsigned WINAPI EchoThreadMain(void * pComPort)
 		sock = handleInfo->m_sock;
 		if (ioInfo->rwMode == READ)
 		{
-			printf("msg receive from client %d\n", sock);
+			//printf("msg receive from client %d\n", sock);
+            cout << "msg from client fd: " << sock << ", address: " <<
+                inet_ntoa(handleInfo->m_addr.sin_addr) << ":" << ntohs(handleInfo->m_addr.sin_port) <<
+                ", msg: " << ioInfo->buffer << endl;
+
 			if (bytesTrans == 0)
 			{
 				closesocket(sock);
@@ -149,14 +168,24 @@ unsigned WINAPI EchoThreadMain(void * pComPort)
 			memset(&ioInfo->overlapped, 0, sizeof(OVERLAPPED));
 			ioInfo->wsaBuf.len = bytesTrans;
 			ioInfo->rwMode = WRITE;
-			WSASend(sock, &ioInfo->wsaBuf, 1, NULL, 0, &ioInfo->overlapped, NULL);
+			int ret = WSASend(sock, &ioInfo->wsaBuf, 1, NULL, 0, &ioInfo->overlapped, NULL);
+			if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING)
+			{
+				cout << "WSASend failed" << endl;
+				break;
+			}
 
 			ioInfo = (LPPER_IO_DATA)malloc(sizeof(PER_IO_DATA));
 			memset(ioInfo, 0, sizeof(PER_IO_DATA));
 			ioInfo->wsaBuf.len = BUF_SIZE;
 			ioInfo->wsaBuf.buf = ioInfo->buffer;
 			ioInfo->rwMode = READ;
-			WSARecv(sock, &ioInfo->wsaBuf, 1, NULL, &flags, &ioInfo->overlapped, NULL);
+			ret = WSARecv(sock, &ioInfo->wsaBuf, 1, NULL, &flags, &ioInfo->overlapped, NULL);
+			if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING)
+			{
+				cout << "WSARecv failed" << endl;
+				break;
+			}
 		}
 		else
 		{
