@@ -98,13 +98,19 @@ int main(int argc, char* argv[])
 		WSACleanup();
 		return 1;
 	}
-	//AcceptEx()
 
 	while (1)
 	{
 		SOCKET clntSock;
 		SOCKADDR_IN clntAddr;
 		int addrLen = sizeof(clntAddr);
+
+
+		//SOCKET accpetSocket;
+		//char outPutBuf[8192];
+		//lpfnAcceptEx(listenHandleInfo->m_sock, accpetSocket, outPutBuf, 8192, )
+
+
 
 		//listenSockÊÇ×èÈûµÄ
 		clntSock = accept(listenHandleInfo->m_sock, (SOCKADDR*)&clntAddr, &addrLen);
