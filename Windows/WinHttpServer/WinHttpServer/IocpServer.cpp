@@ -5,6 +5,7 @@
 
 #include <process.h>
 #include <MSWSock.h>
+//#include <Windows.h>
 
 using namespace std;
 
@@ -43,12 +44,13 @@ bool IocpServer::init()
 	//Õ∂µ›accept«Î«Û
 	for (int i = 0; i < POST_ACCEPT_CNT; ++i)
 	{
-		IoContext* pListenIoCtx = m_pListenClient->createIoContext();
+		IoContext* pListenIoCtx = m_pListenClient->createIoContext(PostType::ACCEPT_EVENT);
 		if (!postAccept(pListenIoCtx))
 		{
 			m_pListenClient->removeIoContext(pListenIoCtx);
 			return false;
 		}
+        CreateIoCompletionPort((HANDLE)pListenIoCtx->m_socket, m_comPort, )
 	}
 
     return true;
@@ -64,9 +66,25 @@ bool IocpServer::stop()
     return false;
 }
 
-unsigned WINAPI IocpServer::IocpWorkerThread(void* arg)
+unsigned WINAPI IocpServer::IocpWorkerThread(LPVOID arg)
 {
+    IocpServer* pThis = static_cast<IocpServer*>(arg);
 
+    DWORD           dwBytes;
+    ClientContext*  pClientCtx = nullptr;
+    IoContext*      pIoCtx = nullptr;
+
+
+    while (1)
+    {
+        int ret = GetQueuedCompletionStatus(pThis->m_comPort, &dwBytes, (PULONG_PTR)&pClientCtx, (LPOVERLAPPED*)&pIoCtx, INFINITE);
+        if(0 == ret)
+        {
+            cout << "GetQueuedCompletionStatus failed";
+            return 0;
+        }
+
+    }
 
 	return 0;
 }
@@ -135,7 +153,7 @@ bool IocpServer::createIocpWorker()
 	GetSystemInfo(&sysInfo);
 	for (DWORD i = 0; i < sysInfo.dwNumberOfProcessors; ++i)
 	{
-		hWorker = (HANDLE)_beginthreadex(NULL, 0, &IocpServer::IocpWorkerThread, this,  0, NULL);
+		hWorker = (HANDLE)_beginthreadex(NULL, 0, IocpWorkerThread, this,  0, NULL);
 		if (NULL == hWorker)
 		{
 			CloseHandle(m_comPort);

@@ -7,15 +7,23 @@
 
 constexpr int IO_BUF_SIZE = 8192;
 
+enum PostType
+{
+    ACCEPT_EVENT,
+    RECV_EVENT,
+    SEND_EVENT
+};
+
 struct IoContext
 {
     OVERLAPPED      m_overlapped;			//每一个重叠io操作都要有一个OVERLAPPED结构
     WSABUF          m_wsaBuf;				//重叠io需要的buf
 	BYTE            m_ioBuf[IO_BUF_SIZE];
-    int             m_opType;
+    PostType        m_postType;
 	SOCKET			m_socket;				//postAccept后再补充一个socket，给后面连接的客户端
 
-	IoContext()
+	IoContext(PostType type) :
+        m_postType(type)
 	{
 		SecureZeroMemory(this, sizeof(IoContext));
 	}
@@ -32,9 +40,9 @@ struct ClientContext
 
 	std::list<IoContext*>	m_ioCtxs;
 
-	IoContext* createIoContext()
+	IoContext* createIoContext(PostType type)
 	{
-		IoContext* ioCtx = new IoContext();
+		IoContext* ioCtx = new IoContext(type);
 		m_ioCtxs.emplace_back(ioCtx);
 		return ioCtx;
 		
@@ -65,7 +73,7 @@ public:
 
 protected:
 	//必须要static _beginthreadex才能访问
-	static unsigned WINAPI IocpWorkerThread(void* arg);
+	static unsigned WINAPI IocpWorkerThread(LPVOID arg);
 
 	bool createListenClient(short listenPort);
 	bool createIocpWorker();
