@@ -151,11 +151,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="DataPacket.h" />
     <ClInclude Include="IocpServer.h" />
     <ClInclude Include="Net.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="DataPacket.cpp" />
     <ClCompile Include="IocpServer.cpp" />
     <ClCompile Include="Net.cpp" />
     <ClCompile Include="pch.cpp">
