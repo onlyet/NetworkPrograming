@@ -18,15 +18,17 @@ struct IoContext
 {
     OVERLAPPED      m_overlapped;			//每一个重叠io操作都要有一个OVERLAPPED结构
     WSABUF          m_wsaBuf;				//重叠io需要的buf
-	BYTE            m_ioBuf[IO_BUF_SIZE];
+	char            m_ioBuf[IO_BUF_SIZE];
     PostType        m_postType;
-	SOCKET			m_socket;				//postAccept后再补充一个socket，给后面连接的客户端
+	SOCKET			m_socket;				//当前进行IO操作的socket，postAccept后再补充一个socket，给后面连接的客户端
 
 	IoContext(PostType type) :
-        m_postType(type)
-	{
-		SecureZeroMemory(this, sizeof(IoContext));
-	}
+       m_postType(type)
+    {
+        SecureZeroMemory(this, sizeof(IoContext));
+        m_wsaBuf.buf = m_ioBuf;
+        m_wsaBuf.len = IO_BUF_SIZE;
+    }
 };
 
 //一个socket有多个重叠操作
@@ -45,8 +47,8 @@ struct ClientContext
 		IoContext* ioCtx = new IoContext(type);
 		m_ioCtxs.emplace_back(ioCtx);
 		return ioCtx;
-		
 	}
+
 	void removeIoContext(IoContext* pIoCtx)
 	{
 		m_ioCtxs.remove(pIoCtx);
@@ -79,6 +81,13 @@ protected:
 	bool createIocpWorker();
 
 	bool postAccept(IoContext* pIoCtx);
+    bool postRecv(IoContext* pIoCtx);
+    bool postSend(IoContext* pIoCtx);
+
+    bool handleAccept(ClientContext* pListenClient, IoContext* pIoCtx);
+    bool handleRecv(ClientContext* pConnClient, IoContext* pIoCtx);
+    bool handleSend(ClientContext* pConnClient, IoContext* pIoCtx);
+
 
 private:
 	short						m_listenPort;
@@ -87,6 +96,7 @@ private:
 	std::list<ClientContext*>	m_ConnClients;
 
 	void*						m_lpfnAcceptEx;		//acceptEx函数指针
+    void*                       m_lpfnGetAcceptExAddr;//GetAcceptExSockaddrs函数指针
 
 	int							m_nWorkerCnt;
 };

@@ -1,11 +1,13 @@
 #include "pch.h"
 #include "IocpServer.h"
 #include "Net.h"
+#include "DataPacket.h"
+
 #include <iostream>
 
 #include <process.h>
 #include <MSWSock.h>
-//#include <Windows.h>
+
 
 using namespace std;
 
@@ -20,8 +22,11 @@ IocpServer::IocpServer(short listenPort) :
 
 IocpServer::~IocpServer()
 {
-	if (INVALID_SOCKET != m_pListenClient->m_socket)
-		closesocket(m_pListenClient->m_socket);
+	if (m_pListenClient)
+	{
+		if (INVALID_SOCKET != m_pListenClient->m_socket)
+			closesocket(m_pListenClient->m_socket);
+	}
 
 	Net::unInit();
 }
@@ -50,7 +55,6 @@ bool IocpServer::init()
 			m_pListenClient->removeIoContext(pListenIoCtx);
 			return false;
 		}
-        CreateIoCompletionPort((HANDLE)pListenIoCtx->m_socket, m_comPort, )
 	}
 
     return true;
@@ -74,7 +78,6 @@ unsigned WINAPI IocpServer::IocpWorkerThread(LPVOID arg)
     ClientContext*  pClientCtx = nullptr;
     IoContext*      pIoCtx = nullptr;
 
-
     while (1)
     {
         int ret = GetQueuedCompletionStatus(pThis->m_comPort, &dwBytes, (PULONG_PTR)&pClientCtx, (LPOVERLAPPED*)&pIoCtx, INFINITE);
@@ -84,6 +87,20 @@ unsigned WINAPI IocpServer::IocpWorkerThread(LPVOID arg)
             return 0;
         }
 
+        switch (pIoCtx->m_postType)
+        {
+        case PostType::ACCEPT_EVENT:
+            pThis->handleAccept(pClientCtx, pIoCtx);
+            break;
+        case PostType::RECV_EVENT:
+            pThis->handleRecv(pClientCtx, pIoCtx);
+            break;
+        case PostType::SEND_EVENT:
+            pThis->handleSend(pClientCtx, pIoCtx);
+            break;
+        default:
+            break;
+        }
     }
 
 	return 0;
@@ -134,13 +151,26 @@ bool IocpServer::createListenClient(short listenPort)
 		&GuidAcceptEx, sizeof(GuidAcceptEx),
 		&lpfnAcceptEx, sizeof(lpfnAcceptEx),
 		&dwBytes, NULL, NULL);
-	if (ret == SOCKET_ERROR)
+	if (SOCKET_ERROR == ret)
 	{
 		cout << "WSAIoctl failed with error: " << WSAGetLastError();
 		return false;
 	}
 	m_lpfnAcceptEx = lpfnAcceptEx;
 
+    //获取GetAcceptExSockaddrs函数指针
+    GUID GuidAddrs = WSAID_GETACCEPTEXSOCKADDRS;
+    LPFN_GETACCEPTEXSOCKADDRS lpfnGetAcceptExAddr = NULL;
+    ret = WSAIoctl(m_pListenClient->m_socket, SIO_GET_EXTENSION_FUNCTION_POINTER,
+        &GuidAddrs, sizeof(GuidAddrs),
+        &lpfnGetAcceptExAddr, sizeof(lpfnGetAcceptExAddr),
+        &dwBytes, NULL, NULL);
+    if (SOCKET_ERROR == ret)
+    {
+        cout << "WSAIoctl failed with error: " << WSAGetLastError();
+        return false;
+    }
+    m_lpfnGetAcceptExAddr = lpfnGetAcceptExAddr;
 
 	return true;
 }
@@ -193,4 +223,105 @@ bool IocpServer::postAccept(IoContext* pIoCtx)
 	}
 
 	return true;
+}
+
+bool IocpServer::postRecv(IoContext* pIoCtx)
+{
+    DWORD dwBytes;
+    //设置这个标志，则没收完的数据下一次接收
+    DWORD flag = MSG_PARTIAL;
+    int ret = WSARecv(pIoCtx->m_socket, &pIoCtx->m_wsaBuf, 1,
+        &dwBytes, &flag, &pIoCtx->m_overlapped, NULL);
+    if (SOCKET_ERROR == ret && WSA_IO_PENDING != WSAGetLastError())
+    {
+        cout << "WSARecv failed with error: " << WSAGetLastError();
+        return false;
+    }
+    return true;
+}
+
+bool IocpServer::postSend(IoContext* pIoCtx)
+{
+    DWORD dwBytesSent;
+    DWORD flag = MSG_PARTIAL;
+    int ret = WSASend(pIoCtx->m_socket, &pIoCtx->m_wsaBuf, 1, &dwBytesSent,
+        flag, &pIoCtx->m_overlapped, NULL);
+    if (SOCKET_ERROR == ret && WSA_IO_PENDING != WSAGetLastError())
+    {
+        cout << "WSASend failed with error: " << WSAGetLastError();
+        return false;
+    }
+    return true;
+}
+
+bool IocpServer::handleAccept(ClientContext* pListenClient, IoContext* pIoCtx)
+{
+    LPFN_GETACCEPTEXSOCKADDRS lpfnGetAcceptExAddr = (LPFN_GETACCEPTEXSOCKADDRS)m_lpfnGetAcceptExAddr;
+    char* pBuf = pIoCtx->m_wsaBuf.buf;
+    ULONG nLen = pIoCtx->m_wsaBuf.len;
+    LPSOCKADDR_IN localAddr = nullptr;
+    LPSOCKADDR_IN peerAddr = nullptr;
+    int localAddrLen = sizeof(SOCKADDR_IN);
+    int peerAddrLen = sizeof(SOCKADDR_IN);
+
+    lpfnGetAcceptExAddr(pBuf, nLen - ((localAddrLen + 16) * 2), localAddrLen + 16,
+        peerAddrLen + 16, (LPSOCKADDR*)&localAddr, &localAddrLen,
+        (LPSOCKADDR*)&peerAddr, &peerAddrLen);
+
+    cout << "local address: " << ntohl(localAddr->sin_addr.s_addr) << ":" << ntohs(localAddr->sin_port) << "\t"
+        << "peer address: " << ntohl(peerAddr->sin_addr.s_addr) << ":" << ntohs(peerAddr->sin_port) << endl;
+
+    //创建新的ClientContext来保存新的连接socket，原来的IoContext要用来接收新的连接
+    ClientContext* pConnClient = new ClientContext;
+    pConnClient->m_socket = pIoCtx->m_socket;
+    //关联新连接的socket与完成端口，只有关联了，才能收到该socket的IO完成通知，GetQueuedCompletionStatus才能取回包
+    HANDLE hRet = CreateIoCompletionPort((HANDLE)pConnClient->m_socket, m_comPort, (ULONG_PTR)pConnClient, 0);
+    if (NULL == hRet)
+    {
+        cout << "failed to associate the accept socket with completion port" << endl;
+        return false;
+    }
+
+    memcpy_s(&pConnClient->m_addr, peerAddrLen, peerAddr, peerAddrLen);
+    //将第一次接收到的数据拷贝到ClientContext::m_inBuf
+    pConnClient->m_inBuf.append(pBuf, nLen - ((localAddrLen + 16) * 2));
+
+    //postRecv,postSend,解析数据包
+    DataPacket::parse(pConnClient->m_inBuf);
+
+    //为投递Recv请求创建新的IoContext
+    IoContext* pRecvIoCtx = pConnClient->createIoContext(PostType::RECV_EVENT);
+
+    //投递recv请求
+    postRecv(pRecvIoCtx);
+
+    //投递一个新的accpet请求
+    SecureZeroMemory(pIoCtx, sizeof(IoContext));
+    postAccept(pIoCtx);
+
+    return false;
+}
+
+bool IocpServer::handleRecv(ClientContext* pConnClient, IoContext* pIoCtx)
+{
+    char* pBuf = pIoCtx->m_wsaBuf.buf;
+    int nLen = pIoCtx->m_wsaBuf.len;
+
+    pConnClient->m_inBuf.append(pBuf, nLen - (sizeof(SOCKADDR_IN) + 16) * 2);
+
+    //解析数据包
+    DataPacket::parse(pConnClient->m_inBuf);
+
+    //为投递Send请求创建新的IoContext
+    IoContext* pSendIoCtx = pConnClient->createIoContext(PostType::SEND_EVENT);
+
+    //投递send请求
+    postSend(pSendIoCtx);
+
+    return true;
+}
+
+bool IocpServer::handleSend(ClientContext* pConnClient, IoContext* pIoCtx)
+{
+    return false;
 }
