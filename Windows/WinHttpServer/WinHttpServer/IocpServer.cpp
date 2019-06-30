@@ -108,20 +108,19 @@ unsigned WINAPI IocpServer::IocpWorkerThread(LPVOID arg)
 
 bool IocpServer::createListenClient(short listenPort)
 {
-	m_pListenClient = new ClientContext();
-
 	//创建完成端口
 	m_comPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
 	if (NULL == m_comPort)
 		return false;
 
 	//创建具有重叠功能的socket
-	m_pListenClient->m_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
-	if (SOCKET_ERROR == m_pListenClient->m_socket)
+	SOCKET listenSocket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+	if (SOCKET_ERROR == listenSocket)
 	{
 		cout << "create socket failed" << endl;
 		return false;
 	}
+    m_pListenClient = new ClientContext(listenSocket);
 
 	//关联监听socket和完成端口
 	CreateIoCompletionPort((HANDLE)m_pListenClient->m_socket, m_comPort, (ULONG_PTR)m_pListenClient, 0);
@@ -272,8 +271,7 @@ bool IocpServer::handleAccept(ClientContext* pListenClient, IoContext* pIoCtx)
         << "peer address: " << ntohl(peerAddr->sin_addr.s_addr) << ":" << ntohs(peerAddr->sin_port) << endl;
 
     //创建新的ClientContext来保存新的连接socket，原来的IoContext要用来接收新的连接
-    ClientContext* pConnClient = new ClientContext;
-    pConnClient->m_socket = pIoCtx->m_socket;
+    ClientContext* pConnClient = new ClientContext(pIoCtx->m_socket);
     //关联新连接的socket与完成端口，只有关联了，才能收到该socket的IO完成通知，GetQueuedCompletionStatus才能取回包
     HANDLE hRet = CreateIoCompletionPort((HANDLE)pConnClient->m_socket, m_comPort, (ULONG_PTR)pConnClient, 0);
     if (NULL == hRet)
@@ -286,6 +284,10 @@ bool IocpServer::handleAccept(ClientContext* pListenClient, IoContext* pIoCtx)
     //将第一次接收到的数据拷贝到ClientContext::m_inBuf
     pConnClient->m_inBuf.append(pBuf, nLen - ((localAddrLen + 16) * 2));
 
+
+    //加入已连接客户端列表
+    m_ConnClients.emplace_back(pConnClient);
+
     //postRecv,postSend,解析数据包
     DataPacket::parse(pConnClient->m_inBuf);
 
@@ -296,10 +298,10 @@ bool IocpServer::handleAccept(ClientContext* pListenClient, IoContext* pIoCtx)
     postRecv(pRecvIoCtx);
 
     //投递一个新的accpet请求
-    SecureZeroMemory(pIoCtx, sizeof(IoContext));
+    pIoCtx->resetBuffer();
     postAccept(pIoCtx);
 
-    return false;
+    return true;
 }
 
 bool IocpServer::handleRecv(ClientContext* pConnClient, IoContext* pIoCtx)
