@@ -29,16 +29,21 @@ protected:
 	bool postAccept(IoContext* pIoCtx);
     bool postRecv(IoContext* pIoCtx);
     bool postSend(IoContext* pIoCtx);
+    bool postParse(ClientContext* pConnClient, IoContext* pIoCtx);
 
     bool handleAccept(ClientContext* pListenClient, IoContext* pIoCtx);
     bool handleRecv(ClientContext* pConnClient, IoContext* pIoCtx);
     bool handleSend(ClientContext* pConnClient, IoContext* pIoCtx);
+    bool handleParse(ClientContext* pConnClient, IoContext* pIoCtx);
+
+    void addClient(ClientContext* pConnClient);
 
 private:
 	short						m_listenPort;
 	HANDLE						m_comPort;              //完成端口
 	ClientContext*				m_pListenClient;
-	std::list<ClientContext*>	m_ConnClients;          //已连接客户端列表
+	std::list<ClientContext*>	m_connList;             //已连接客户端列表
+    CRITICAL_SECTION            m_csConnList;           //保护连接列表
 
 	void*						m_lpfnAcceptEx;		    //acceptEx函数指针
     void*                       m_lpfnGetAcceptExAddr;  //GetAcceptExSockaddrs函数指针

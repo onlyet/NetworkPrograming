@@ -1,6 +1,8 @@
 #ifndef __NET_H__
 #define __NET_H__
 
+#include "Buffer.h"
+
 #include <string>
 #include <list>
 
@@ -10,7 +12,8 @@ enum PostType
 {
     ACCEPT_EVENT,
     RECV_EVENT,
-    SEND_EVENT
+    SEND_EVENT,
+    PARSE_EVNET,    //数据包解析
 };
 
 struct IoContext
@@ -43,14 +46,23 @@ struct ClientContext
     SOCKET					m_socket;
     SOCKADDR_IN				m_addr;
 
-    std::string				m_inBuf;
+    //std::string				m_inBuf;
     std::string				m_outBuf;
+    //CRITICAL_SECTION        m_csInBuf;
+    //CONDITION_VARIABLE      m_cvInBuf;
+    Buffer                  m_inBuf;
 
     std::list<IoContext*>	m_ioCtxs;
 
     ClientContext(const SOCKET& socket = INVALID_SOCKET) :
         m_socket(socket)
     {
+        //InitializeCriticalSection(&m_csInBuf);
+    }
+
+    ~ClientContext()
+    {
+        //DeleteCriticalSection(&m_csInBuf);
     }
 
     IoContext* createIoContext(PostType type)
@@ -65,12 +77,22 @@ struct ClientContext
         m_ioCtxs.remove(pIoCtx);
     }
 
+    //void fillInBuf(const std::string& inBuf)
+    //{
+    //    EnterCriticalSection(&m_csInBuf);
+    //    m_inBuf.append(inBuf);
+    //    LeaveCriticalSection(&m_csInBuf);
+    //}
 };
+
+struct ClientContext;
 
 struct Net
 {
     static bool init();
     static bool unInit();
+
+    static bool associateWithCompletionPort(HANDLE completionPort, ClientContext* pConnClient);
 };
 
 #endif // !__NET_H__

@@ -18,6 +18,7 @@ IocpServer::IocpServer(short listenPort) :
 	, m_pListenClient(nullptr)
 	, m_nWorkerCnt(0)
 {
+    InitializeCriticalSection(&m_csConnList);
 }
 
 IocpServer::~IocpServer()
@@ -27,6 +28,8 @@ IocpServer::~IocpServer()
 		if (INVALID_SOCKET != m_pListenClient->m_socket)
 			closesocket(m_pListenClient->m_socket);
 	}
+
+    DeleteCriticalSection(&m_csConnList);
 
 	Net::unInit();
 }
@@ -253,6 +256,18 @@ bool IocpServer::postSend(IoContext* pIoCtx)
     return true;
 }
 
+bool IocpServer::postParse(ClientContext* pConnClient, IoContext* pIoCtx)
+{
+    DWORD dwTransferred = pIoCtx->m_wsaBuf.len;
+    int ret = PostQueuedCompletionStatus(m_comPort, dwTransferred, (ULONG_PTR)pConnClient, &pIoCtx->m_overlapped);
+    if (FALSE == ret)
+    {
+        cout << "PostQueuedCompletionStatus failed with error: " << WSAGetLastError() << endl;
+        return false;
+    }
+    return true;
+}
+
 bool IocpServer::handleAccept(ClientContext* pListenClient, IoContext* pIoCtx)
 {
     LPFN_GETACCEPTEXSOCKADDRS lpfnGetAcceptExAddr = (LPFN_GETACCEPTEXSOCKADDRS)m_lpfnGetAcceptExAddr;
@@ -272,34 +287,34 @@ bool IocpServer::handleAccept(ClientContext* pListenClient, IoContext* pIoCtx)
 
     //创建新的ClientContext来保存新的连接socket，原来的IoContext要用来接收新的连接
     ClientContext* pConnClient = new ClientContext(pIoCtx->m_socket);
+    memcpy_s(&pConnClient->m_addr, peerAddrLen, peerAddr, peerAddrLen);
+
     //关联新连接的socket与完成端口，只有关联了，才能收到该socket的IO完成通知，GetQueuedCompletionStatus才能取回包
-    HANDLE hRet = CreateIoCompletionPort((HANDLE)pConnClient->m_socket, m_comPort, (ULONG_PTR)pConnClient, 0);
-    if (NULL == hRet)
+    if (!Net::associateWithCompletionPort(m_comPort, pConnClient))
     {
-        cout << "failed to associate the accept socket with completion port" << endl;
         return false;
     }
 
-    memcpy_s(&pConnClient->m_addr, peerAddrLen, peerAddr, peerAddrLen);
-    //将第一次接收到的数据拷贝到ClientContext::m_inBuf
+    /** 
+    * 将第一次接收到的数据拷贝到ClientContext::m_inBuf
+    * 此处不加锁，因为现在还没有其它线程访问m_inBuf
+    */
     pConnClient->m_inBuf.append(pBuf, nLen - ((localAddrLen + 16) * 2));
-
-
-    //加入已连接客户端列表
-    m_ConnClients.emplace_back(pConnClient);
-
-    //postRecv,postSend,解析数据包
-    DataPacket::parse(pConnClient->m_inBuf);
-
-    //为投递Recv请求创建新的IoContext
-    IoContext* pRecvIoCtx = pConnClient->createIoContext(PostType::RECV_EVENT);
-
-    //投递recv请求
-    postRecv(pRecvIoCtx);
 
     //投递一个新的accpet请求
     pIoCtx->resetBuffer();
     postAccept(pIoCtx);
+
+    //将客户端加入连接列表
+    addClient(pConnClient);
+
+    //投递解析请求
+    IoContext* pParseIoCtx = pConnClient->createIoContext(PostType::PARSE_EVNET);
+    postParse(pConnClient, pParseIoCtx);
+
+    //投递recv请求
+    IoContext* pRecvIoCtx = pConnClient->createIoContext(PostType::RECV_EVENT);
+    postRecv(pRecvIoCtx);
 
     return true;
 }
@@ -311,8 +326,7 @@ bool IocpServer::handleRecv(ClientContext* pConnClient, IoContext* pIoCtx)
 
     pConnClient->m_inBuf.append(pBuf, nLen - (sizeof(SOCKADDR_IN) + 16) * 2);
 
-    //解析数据包
-    DataPacket::parse(pConnClient->m_inBuf);
+
 
     //为投递Send请求创建新的IoContext
     IoContext* pSendIoCtx = pConnClient->createIoContext(PostType::SEND_EVENT);
@@ -326,4 +340,23 @@ bool IocpServer::handleRecv(ClientContext* pConnClient, IoContext* pIoCtx)
 bool IocpServer::handleSend(ClientContext* pConnClient, IoContext* pIoCtx)
 {
     return false;
+}
+
+bool IocpServer::handleParse(ClientContext* pConnClient, IoContext* pIoCtx)
+{
+    //解析数据包
+    DataPacket::parse(pConnClient->m_inBuf);
+
+    //投递send请求
+    IoContext* pRecvIoCtx = pConnClient->createIoContext(PostType::SEND_EVENT);
+    postSend(pRecvIoCtx);
+
+    return true;
+}
+
+void IocpServer::addClient(ClientContext* pConnClient)
+{
+    EnterCriticalSection(&m_csConnList);
+    m_connList.emplace_back(pConnClient);
+    LeaveCriticalSection(&m_csConnList);
 }
