@@ -27,3 +27,15 @@ bool Net::associateWithCompletionPort(HANDLE completionPort, ClientContext* pCon
     }
     return true;
 }
+
+bool Net::setKeepAlive(SOCKET socket, bool on)
+{
+    DWORD opt = on;
+    int ret = setsockopt(socket, SOL_SOCKET, SO_KEEPALIVE, (char*)&opt, sizeof(DWORD));
+    if (0 != ret)
+    {
+        cout << "setsockopt failed" << endl;
+        return false;
+    }
+    return true;
+}
