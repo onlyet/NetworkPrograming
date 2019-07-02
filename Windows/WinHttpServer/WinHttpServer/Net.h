@@ -4,8 +4,10 @@
 #include "Buffer.h"
 
 #include <string>
-#include <list>
+#include <map>
+#include <algorithm>
 
+//设置成4K的倍数
 constexpr int IO_BUF_SIZE = 8192;
 
 enum PostType
@@ -52,7 +54,7 @@ struct ClientContext
     //CONDITION_VARIABLE      m_cvInBuf;
     Buffer                  m_inBuf;
 
-    std::list<IoContext*>	m_ioCtxs;
+    std::map<PostType, IoContext*> m_ioCtxs;
 
     ClientContext(const SOCKET& socket = INVALID_SOCKET) :
         m_socket(socket)
@@ -62,19 +64,30 @@ struct ClientContext
 
     ~ClientContext()
     {
-        //DeleteCriticalSection(&m_csInBuf);
+        if (INVALID_SOCKET != m_socket)
+        {
+            closesocket(m_socket);
+            m_socket = INVALID_SOCKET;
+        }
+        std::for_each(m_ioCtxs.begin(), m_ioCtxs.end(), [](const IoContext*& ioCtx) { delete ioCtx; });
+        m_ioCtxs.erase(m_ioCtxs.begin(), m_ioCtxs.end());
     }
 
-    IoContext* createIoContext(PostType type)
+    IoContext* getIoContext(PostType type)
     {
+        std::map<PostType, IoContext*>::iterator it = m_ioCtxs.find(type);
+        if (it != m_ioCtxs.end())
+        {
+            return m_ioCtxs[type];
+        }
         IoContext* ioCtx = new IoContext(type);
-        m_ioCtxs.emplace_back(ioCtx);
+        m_ioCtxs.insert(std::make_pair(type, ioCtx));
         return ioCtx;
     }
 
     void removeIoContext(IoContext* pIoCtx)
     {
-        m_ioCtxs.remove(pIoCtx);
+        m_ioCtxs.erase(pIoCtx->m_postType);
     }
 
     //void fillInBuf(const std::string& inBuf)
@@ -93,6 +106,8 @@ struct Net
     static bool unInit();
 
     static bool associateWithCompletionPort(HANDLE completionPort, ClientContext* pConnClient);
+
+    static bool setKeepAlive(SOCKET socket, bool on);
 };
 
 #endif // !__NET_H__

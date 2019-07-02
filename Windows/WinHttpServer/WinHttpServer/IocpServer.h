@@ -17,7 +17,7 @@ public:
 
     bool init();
     bool start();
-    bool stop();
+    bool exit();
 
 protected:
 	//必须要static _beginthreadex才能访问
@@ -36,11 +36,13 @@ protected:
     bool handleSend(ClientContext* pConnClient, IoContext* pIoCtx);
     bool handleParse(ClientContext* pConnClient, IoContext* pIoCtx);
 
+    //线程安全
     void addClient(ClientContext* pConnClient);
 
 private:
 	short						m_listenPort;
-	HANDLE						m_comPort;              //完成端口
+	HANDLE						m_hComPort;              //完成端口
+    HANDLE                      m_hExitEvent;           //退出线程事件
 	ClientContext*				m_pListenClient;
 	std::list<ClientContext*>	m_connList;             //已连接客户端列表
     CRITICAL_SECTION            m_csConnList;           //保护连接列表
