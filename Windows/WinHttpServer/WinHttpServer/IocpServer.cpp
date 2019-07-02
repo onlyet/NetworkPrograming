@@ -258,8 +258,7 @@ bool IocpServer::postSend(IoContext* pIoCtx)
 
 bool IocpServer::postParse(ClientContext* pConnClient, IoContext* pIoCtx)
 {
-    DWORD dwTransferred = pIoCtx->m_wsaBuf.len;
-    int ret = PostQueuedCompletionStatus(m_comPort, dwTransferred, (ULONG_PTR)pConnClient, &pIoCtx->m_overlapped);
+    int ret = PostQueuedCompletionStatus(m_comPort, 0, (ULONG_PTR)pConnClient, &pIoCtx->m_overlapped);
     if (FALSE == ret)
     {
         cout << "PostQueuedCompletionStatus failed with error: " << WSAGetLastError() << endl;
@@ -324,9 +323,8 @@ bool IocpServer::handleRecv(ClientContext* pConnClient, IoContext* pIoCtx)
     char* pBuf = pIoCtx->m_wsaBuf.buf;
     int nLen = pIoCtx->m_wsaBuf.len;
 
-    pConnClient->m_inBuf.append(pBuf, nLen - (sizeof(SOCKADDR_IN) + 16) * 2);
-
-
+    //加锁
+    DataPacket::append(pConnClient, pBuf, nLen - (sizeof(SOCKADDR_IN) + 16) * 2);
 
     //为投递Send请求创建新的IoContext
     IoContext* pSendIoCtx = pConnClient->createIoContext(PostType::SEND_EVENT);
@@ -344,8 +342,8 @@ bool IocpServer::handleSend(ClientContext* pConnClient, IoContext* pIoCtx)
 
 bool IocpServer::handleParse(ClientContext* pConnClient, IoContext* pIoCtx)
 {
-    //解析数据包
-    DataPacket::parse(pConnClient->m_inBuf);
+    //解析数据包，加锁
+    DataPacket::parse(pConnClient);
 
     //投递send请求
     IoContext* pRecvIoCtx = pConnClient->createIoContext(PostType::SEND_EVENT);

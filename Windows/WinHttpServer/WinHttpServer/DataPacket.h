@@ -1,13 +1,15 @@
 #ifndef __DATA_PACKET_H__
 #define __DATA_PACKET_H__
 
-#include "Buffer.h"
-
 #include <string>
+
+struct ClientContext;
 
 struct DataPacket
 {
-    static bool parse(Buffer data);
+    static void append(ClientContext* pConClient, const char* inBuf, size_t len);
+    //static bool parse(const std::string& data);
+    static bool parse(ClientContext* pConnClient);
 };
 
 #endif // !__DATA_PACKET_H__

@@ -1,8 +1,22 @@
 #include "pch.h"
 #include "DataPacket.h"
+#include "Net.h"
 
-bool DataPacket::parse(Buffer data)
+void DataPacket::append(ClientContext* pConClient, const char* inBuf, size_t len)
 {
-    
-    return false;
+    pConClient->appendToBuffer(inBuf, len);
+}
+
+//bool DataPacket::parse(const std::string& data)
+//{
+//    return false;
+//}
+
+bool DataPacket::parse(ClientContext* pConnClient)
+{
+    EnterCriticalSection(&pConnClient->m_csInBuf);
+
+    LeaveCriticalSection(&pConnClient->m_csInBuf);
+
+    return true;
 }

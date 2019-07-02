@@ -46,11 +46,11 @@ struct ClientContext
     SOCKET					m_socket;
     SOCKADDR_IN				m_addr;
 
-    //std::string				m_inBuf;
+    std::string				m_inBuf;        //数据包输入缓冲区，非线程安全，所以加锁
     std::string				m_outBuf;
-    //CRITICAL_SECTION        m_csInBuf;
+    CRITICAL_SECTION        m_csInBuf;
     //CONDITION_VARIABLE      m_cvInBuf;
-    Buffer                  m_inBuf;
+    //Buffer                  m_inBuf;
 
     std::list<IoContext*>	m_ioCtxs;
 
@@ -77,12 +77,19 @@ struct ClientContext
         m_ioCtxs.remove(pIoCtx);
     }
 
-    //void fillInBuf(const std::string& inBuf)
-    //{
-    //    EnterCriticalSection(&m_csInBuf);
-    //    m_inBuf.append(inBuf);
-    //    LeaveCriticalSection(&m_csInBuf);
-    //}
+    void appendToBuffer(const char* inBuf, size_t len)
+    {
+        EnterCriticalSection(&m_csInBuf);
+        m_inBuf.append(inBuf, len);
+        LeaveCriticalSection(&m_csInBuf);
+    }
+
+    void appendToBuffer(const std::string& inBuf)
+    {
+        EnterCriticalSection(&m_csInBuf);
+        m_inBuf.append(inBuf);
+        LeaveCriticalSection(&m_csInBuf);
+    }
 };
 
 struct ClientContext;
