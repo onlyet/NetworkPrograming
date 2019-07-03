@@ -17,15 +17,19 @@ bool Net::unInit()
     return true;
 }
 
-bool Net::associateWithCompletionPort(HANDLE completionPort, ClientContext* pConnClient)
+SOCKET Net::WSASocket_()
 {
-    HANDLE hRet = CreateIoCompletionPort((HANDLE)pConnClient->m_socket, completionPort, (ULONG_PTR)pConnClient, 0);
-    if (NULL == hRet)
-    {
-        cout << "failed to associate the accept socket with completion port" << endl;
-        return false;
-    }
-    return true;
+    return ::WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+}
+
+int Net::bind(SOCKET s, const LPSOCKADDR_IN pAddr)
+{
+    return ::bind(s, (LPSOCKADDR)pAddr, sizeof(SOCKADDR_IN));
+}
+
+int Net::listen(SOCKET s, int backlog)
+{
+    return ::listen(s, backlog);
 }
 
 bool Net::setKeepAlive(SOCKET socket, bool on)

@@ -88,7 +88,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
@@ -153,13 +153,22 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Buffer.h" />
+    <ClInclude Include="ClientContext.h" />
+    <ClInclude Include="Codec.h" />
     <ClInclude Include="DataPacket.h" />
+    <ClInclude Include="Global.h" />
+    <ClInclude Include="IoContext.h" />
     <ClInclude Include="IocpServer.h" />
     <ClInclude Include="Net.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="Slice.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Buffer.cpp" />
+    <ClCompile Include="ClientContext.cpp" />
+    <ClCompile Include="Codec.cpp" />
     <ClCompile Include="DataPacket.cpp" />
+    <ClCompile Include="IoContext.cpp" />
     <ClCompile Include="IocpServer.cpp" />
     <ClCompile Include="Net.cpp" />
     <ClCompile Include="pch.cpp">

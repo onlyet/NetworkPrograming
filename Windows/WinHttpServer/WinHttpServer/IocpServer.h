@@ -23,6 +23,11 @@ protected:
 	//必须要static _beginthreadex才能访问
 	static unsigned WINAPI IocpWorkerThread(LPVOID arg);
 
+    HANDLE associateWithCompletionPort(ClientContext* pClient);
+    bool getAcceptExPtr();
+    bool getAcceptExSockaddrs();
+    bool setKeepAlive(SOCKET s, IoContext* pIoCtx, int time = 30, int interval = 10);
+
 	bool createListenClient(short listenPort);
 	bool createIocpWorker();
 
@@ -35,6 +40,8 @@ protected:
     bool handleRecv(ClientContext* pConnClient, IoContext* pIoCtx);
     bool handleSend(ClientContext* pConnClient, IoContext* pIoCtx);
     bool handleParse(ClientContext* pConnClient, IoContext* pIoCtx);
+
+    bool decodePacket();
 
     //线程安全
     void addClient(ClientContext* pConnClient);

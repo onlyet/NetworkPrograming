@@ -1,39 +1,56 @@
 #ifndef __BUFFER_H__
 #define __BUFFER_H__
 
+#include "slice.h"
 #include <string>
 
-class Buffer
+//std::copy : _DEPRECATE_UNCHECKED：在Preprocessor添加_SCL_SECURE_NO_WARNINGS
+
+class Buffer 
 {
 public:
-    Buffer()
+    Buffer();
+    ~Buffer();
+    void clear();
+    size_t size() const;
+    bool empty() const;
+    char* data() const;
+    char* begin() const;
+    char* end() const;
+    char* makeRoom(size_t len);
+    void makeRoom();
+    size_t space() const;	//缓存可用空间
+    void addSize(size_t len);
+    char* allocRoom(size_t len);
+    Buffer& append(const char *p, size_t len);
+    Buffer& append(std::string s);
+    //Buffer& append(Slice slice) { return append(slice.data(), slice.size()); }
+    Buffer& append(const char *p);
+    template <class T>
+    Buffer& appendValue(const T &v) 
     {
-        InitializeCriticalSection(&m_cs);
+        append((const char *)&v, sizeof v);
+        return *this;
     }
+    Buffer& consume(size_t len);
+    Buffer& absorb(Buffer &buf);
+    void setSuggestSize(size_t sz);
+    Buffer(const Buffer &b);
+    Buffer& operator=(const Buffer &b);
 
-    ~Buffer()
-    {
-        DeleteCriticalSection(&m_cs);
-    }
-
-    void append(const char* buf, const size_t len)
-    {
-        EnterCriticalSection(&m_cs);
-        m_buf.append(buf, len);
-        LeaveCriticalSection(&m_cs);
-    }
-
-    void append(const std::string& buf)
-    {
-        EnterCriticalSection(&m_cs);
-        m_buf.append(buf);
-        LeaveCriticalSection(&m_cs);
-    }
-
+    //转换为Slice
+    operator Slice() { return Slice(data(), size()); }
 
 private:
-    std::string         m_buf;
-    CRITICAL_SECTION    m_cs;
+    void moveHead();
+    void expand(size_t len);	//增加buffer长度，类似于vector
+    void copyFrom(const Buffer& b);
+
+private:
+    char* buf_;
+    size_t b_, e_, cap_, exp_;
+ 
 };
 
 #endif // !__BUFFER_H__
+

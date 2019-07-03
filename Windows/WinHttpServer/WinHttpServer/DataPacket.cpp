@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "DataPacket.h"
 #include "Net.h"
+#include "ClientContext.h"
 
 void DataPacket::append(ClientContext* pConClient, const char* inBuf, size_t len)
 {

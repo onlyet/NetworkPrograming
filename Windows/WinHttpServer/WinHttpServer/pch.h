@@ -11,6 +11,9 @@
 
 // TODO: add headers that you want to pre-compile here
 
+//±ÜÃâstd::max³öÏÖ´íÎóexpected an identifier
+#define NOMINMAX
+
 #include <WinSock2.h>
 
 #endif //PCH_H
