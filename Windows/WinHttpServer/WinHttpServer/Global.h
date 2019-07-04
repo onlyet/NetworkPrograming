@@ -12,6 +12,7 @@ enum PostType
     RECV_EVENT,
     SEND_EVENT,
     PARSE_EVNET,    //数据包解析
+    CLOSE_EVENT,
 };
 
 #endif // !__GLOBAL_H__

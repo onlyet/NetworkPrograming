@@ -93,6 +93,11 @@ Buffer& Buffer::append(std::string s)
     return append(s.data(), s.size());
 }
 
+Buffer& Buffer::append(Slice slice)
+{
+    return append(slice.data(), slice.size());
+}
+
 Buffer& Buffer::append(const char* p)
 {
     return append(p, strlen(p));

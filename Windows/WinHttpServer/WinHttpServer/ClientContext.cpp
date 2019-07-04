@@ -20,14 +20,24 @@ ClientContext::~ClientContext()
     m_ioCtxs.erase(m_ioCtxs.begin(), m_ioCtxs.end());
 }
 
-IoContext * ClientContext::getIoContext(PostType type)
+IoContext* ClientContext::getIoContext(PostType type)
 {
     std::map<PostType, IoContext*>::iterator it = m_ioCtxs.find(type);
     if (it != m_ioCtxs.end())
     {
         return m_ioCtxs[type];
     }
-    IoContext* ioCtx = new IoContext(type);
+
+    SOCKET ioSocket;
+    if (ACCEPT_EVENT == type)
+    {
+        ioSocket = INVALID_SOCKET;
+    }
+    else
+    {
+        ioSocket = m_socket;
+    }
+    IoContext* ioCtx = new IoContext(type, ioSocket);
     m_ioCtxs.insert(std::make_pair(type, ioCtx));
     return ioCtx;
 }

@@ -30,6 +30,7 @@ struct ClientContext
     //std::string                         m_inBuf;        //数据包输入缓冲区，非线程安全，所以加锁
     //std::string                         m_outBuf;
     Buffer                              m_inBuf;
+    Buffer                              m_outBuf;
     HttpCodec*                          m_pCodec;
     CRITICAL_SECTION                    m_csInBuf;
     std::map<PostType, IoContext*>      m_ioCtxs;

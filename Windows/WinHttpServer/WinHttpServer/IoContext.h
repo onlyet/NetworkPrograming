@@ -5,7 +5,8 @@
 
 struct IoContext
 {
-    IoContext(PostType type);
+    IoContext(PostType type, SOCKET s = INVALID_SOCKET);
+    ~IoContext();
 
     void resetBuffer();
 
@@ -14,6 +15,7 @@ struct IoContext
     char            m_ioBuf[IO_BUF_SIZE];
     PostType        m_postType;
     SOCKET			m_socket;				//当前进行IO操作的socket，postAccept后再补充一个socket，给后面连接的客户端
+    DWORD           m_dwBytesTransferred;   //本次io传输的字节数
 };
 
 

@@ -2,11 +2,30 @@
 //
 
 #include "pch.h"
+#include "IocpServer.h"
 #include <iostream>
+
+using namespace std;
 
 int main()
 {
-    std::cout << "Hello World!\n"; 
+    {
+        IocpServer server(5000);
+        bool ret = server.start();
+        if (!ret)
+        {
+            cout << "start failed" << endl;
+            return 0;
+        }
+
+        while (1)
+        {
+            Sleep(1000);
+        }
+    }
+
+    system("pause");
+    return 0;
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
