@@ -74,7 +74,19 @@ bool IocpServer::stop()
     for_each(m_hWorkerThreads.begin(), m_hWorkerThreads.end(),
         [](const HANDLE& h) { CloseHandle(h); });
 
+    for_each(m_acceptIoCtxList.begin(), m_acceptIoCtxList.end(),
+        [](IoContext* pIoCtx) {
 
+        CancelIo((HANDLE)pIoCtx->m_socket);
+        closesocket(pIoCtx->m_socket);
+        pIoCtx->m_socket = INVALID_SOCKET;
+
+        while (!HasOverlappedIoCompleted(&pIoCtx->m_overlapped))
+            Sleep(1);
+
+        delete pIoCtx;
+    });
+    m_acceptIoCtxList.clear();
 
     if (m_hExitEvent)
     {
