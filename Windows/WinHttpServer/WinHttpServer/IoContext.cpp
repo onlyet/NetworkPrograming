@@ -18,6 +18,13 @@ IoContext::~IoContext()
     cout << "IoContext::~IoContext()" << endl;
 }
 
+IoContext* IoContext::newIoContext(PostType type, SOCKET s)
+{
+    IoContext* pIoCtx = new IoContext(type, s);
+
+    return pIoCtx;
+}
+
 void IoContext::resetBuffer()
 {
     SecureZeroMemory(&m_overlapped, sizeof(OVERLAPPED));

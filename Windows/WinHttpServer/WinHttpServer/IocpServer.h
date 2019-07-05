@@ -4,6 +4,7 @@
 #include <list>
 #include <vector>
 
+struct ListenContext;
 struct IoContext;
 struct ClientContext;
 
@@ -25,7 +26,7 @@ protected:
     //必须要static _beginthreadex才能访问
     static unsigned WINAPI IocpWorkerThread(LPVOID arg);
 
-    HANDLE associateWithCompletionPort(ClientContext* pClient);
+    HANDLE associateWithCompletionPort(SOCKET s, ULONG_PTR completionKey);
     bool getAcceptExPtr();
     bool getAcceptExSockaddrs();
     bool setKeepAlive(SOCKET s, IoContext* pIoCtx, int time = 30, int interval = 10);
@@ -33,6 +34,7 @@ protected:
     bool createListenClient(short listenPort);
     bool createIocpWorker();
     bool exitIocpWorker();
+    bool initAcceptIoContext();
 
     bool postAccept(IoContext* pIoCtx);
     bool postRecv(IoContext* pIoCtx);
@@ -59,15 +61,21 @@ private:
     short                       m_listenPort;
     HANDLE                      m_hComPort;              //完成端口
     HANDLE                      m_hExitEvent;           //退出线程事件
-    std::vector<HANDLE>         m_hWorkerThreads;       //工作线程句柄列表
-    ClientContext*              m_pListenClient;
-    std::list<ClientContext*>   m_connList;             //已连接客户端列表
-    CRITICAL_SECTION            m_csConnList;           //保护连接列表
 
     void*                       m_lpfnAcceptEx;		    //acceptEx函数指针
     void*                       m_lpfnGetAcceptExAddr;  //GetAcceptExSockaddrs函数指针
 
     int                         m_nWorkerCnt;           //io工作线程数量
+    DWORD                       m_nConnClientCnt;       //已连接客户端数量
+    DWORD                       m_nMaxConnClientCnt;    //最大客户端数量
+
+    ListenContext*              m_pListenCtx;            //监听上下文
+    std::list<ClientContext*>   m_connList;             //已连接客户端列表
+    CRITICAL_SECTION            m_csConnList;           //保护连接列表
+
+    std::vector<HANDLE>         m_hWorkerThreads;       //工作线程句柄列表
+    std::vector<IoContext*>     m_acceptIoCtxList;      //接收连接的IO上下文列表
+
 };
 
 #endif // !__IOCP_SERVER_H__

@@ -32,13 +32,38 @@ int Net::listen(SOCKET s, int backlog)
     return ::listen(s, backlog);
 }
 
-bool Net::setKeepAlive(SOCKET socket, bool on)
+bool Net::setKeepAlive(SOCKET s, bool on)
 {
     DWORD opt = on;
-    int ret = setsockopt(socket, SOL_SOCKET, SO_KEEPALIVE, (char*)&opt, sizeof(DWORD));
-    if (0 != ret)
+    int ret = setsockopt(s, SOL_SOCKET, SO_KEEPALIVE, (char*)&opt, sizeof(DWORD));
+    if (SOCKET_ERROR == ret)
     {
-        cout << "setsockopt failed" << endl;
+        cout << "setsockopt failed with error: " << WSAGetLastError() << endl;
+        return false;
+    }
+    return true;
+}
+
+bool Net::setLinger(SOCKET s, bool on, int timeoutSecs)
+{
+    LINGER linger;
+    linger.l_onoff = on;
+    linger.l_linger = timeoutSecs;
+    int ret = setsockopt(s, SOL_SOCKET, SO_LINGER, (char*)&linger, sizeof(LINGER));
+    if (SOCKET_ERROR == ret)
+    {
+        cout << "setsockopt failed with error: " << WSAGetLastError() << endl;
+        return false;
+    }
+    return true;
+}
+
+bool Net::updateAcceptContext(SOCKET listenSocket, SOCKET acceptSocket)
+{
+    int ret = setsockopt(acceptSocket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, (char*)&listenSocket, sizeof(SOCKET));
+    if (SOCKET_ERROR == ret)
+    {
+        cout << "setsockopt failed with error: " << WSAGetLastError() << endl;
         return false;
     }
     return true;

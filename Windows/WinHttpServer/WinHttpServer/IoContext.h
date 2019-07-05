@@ -8,6 +8,8 @@ struct IoContext
     IoContext(PostType type, SOCKET s = INVALID_SOCKET);
     ~IoContext();
 
+    static IoContext* newIoContext(PostType type, SOCKET s = INVALID_SOCKET);
+
     void resetBuffer();
 
     OVERLAPPED      m_overlapped;			//每一个重叠io操作都要有一个OVERLAPPED结构

@@ -16,7 +16,16 @@ struct Net
 
     //static int 
 
-    static bool setKeepAlive(SOCKET socket, bool on);
+    static bool setKeepAlive(SOCKET s, bool on);
+    //默认强制关闭（连接重置）
+    static bool setLinger(SOCKET s, bool on = true, int timeoutSecs = 0);
+
+    /*
+    * When the AcceptEx function returns, the socket sAcceptSocket is in the default state for a connected socket.
+    * The socket sAcceptSocket does not inherit the properties of the socket associated with sListenSocket parameter
+    * until SO_UPDATE_ACCEPT_CONTEXT is set on the socket.
+    */
+    static bool updateAcceptContext(SOCKET listenSocket, SOCKET acceptSocket);
 };
 
 #endif // !__NET_H__
