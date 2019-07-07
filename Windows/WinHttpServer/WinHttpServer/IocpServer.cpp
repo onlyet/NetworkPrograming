@@ -356,8 +356,8 @@ bool IocpServer::postAccept(IoContext* pIoCtx)
 
     DWORD dwRecvByte;
     if (FALSE == lpfnAcceptEx(m_pListenCtx->m_socket, pIoCtx->m_socket, pBuf,
-        nLen - ACCEPT_ADDRS_SIZE, sizeof(SOCKADDR) + 16,
-        sizeof(SOCKADDR) + 16, &dwRecvByte, pOverlapped))
+        nLen - ACCEPT_ADDRS_SIZE, sizeof(SOCKADDR) + 16, sizeof(SOCKADDR) + 16,
+        &dwRecvByte, pOverlapped))
     {
         if (WSA_IO_PENDING != WSAGetLastError())
         {
