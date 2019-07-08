@@ -22,6 +22,7 @@ ClientContext::ClientContext(const SOCKET& socket) :
     , m_recvIoCtx(new IoContext(PostType::RECV_EVENT, m_socket))
     , m_sendIoCtx(new IoContext(PostType::SEND_EVENT, m_socket))
 {
+    SecureZeroMemory(&m_addr, sizeof(SOCKADDR_IN));
 }
 
 ClientContext::~ClientContext()

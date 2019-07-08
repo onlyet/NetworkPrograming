@@ -159,6 +159,7 @@
     <ClInclude Include="Global.h" />
     <ClInclude Include="IoContext.h" />
     <ClInclude Include="IocpServer.h" />
+    <ClInclude Include="LockGuard.h" />
     <ClInclude Include="Net.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Slice.h" />

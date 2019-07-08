@@ -4,6 +4,7 @@
 #include "IoContext.h"
 #include "ClientContext.h"
 //#include "DataPacket.h"
+#include "LockGuard.h"
 
 #include <iostream>
 
@@ -12,18 +13,20 @@
 
 using namespace std;
 
+//工作线程退出标志
 #define EXIT_THREAD 0
 constexpr int POST_ACCEPT_CNT = 10;
 
-IocpServer::IocpServer(short listenPort) :
-    m_hComPort(NULL)
+IocpServer::IocpServer(short listenPort, int maxConnectionCount) :
+    m_bIsShutdown(false)
+    , m_hComPort(NULL)
     , m_hExitEvent(NULL)
     , m_listenPort(listenPort)
     //, m_pListenClient(nullptr)
     , m_pListenCtx(nullptr)
     , m_nWorkerCnt(0)
     , m_nConnClientCnt(0)
-    , m_nMaxConnClientCnt(10000)
+    , m_nMaxConnClientCnt(maxConnectionCount)
 {
     m_hExitEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
     if (WSA_INVALID_EVENT == m_hExitEvent)
@@ -50,17 +53,14 @@ bool IocpServer::start()
     }
     if (!createListenClient(m_listenPort))
     {
-        stop();
         return false;
     }
     if (!createIocpWorker())
     {
-        stop();
         return false;
     }
     if (!initAcceptIoContext())
     {
-        stop();
         return false;
     }
     return true;
@@ -105,27 +105,65 @@ bool IocpServer::stop()
         delete m_pListenCtx;
         m_pListenCtx = nullptr;
     }
-    removeClients();
+    removeAllClientContext();
 
     return true;
+}
+
+bool IocpServer::shutdown()
+{
+    m_bIsShutdown = true;
+
+    int ret = CancelIoEx((HANDLE)m_pListenCtx->m_socket, NULL);
+    if (0 == ret)
+    {
+        cout << "CancelIoEx failed with error: " << WSAGetLastError() << endl;
+        return false;
+    }
+    closesocket(m_pListenCtx->m_socket);
+    m_pListenCtx->m_socket = INVALID_SOCKET;
+
+    for_each(m_acceptIoCtxList.begin(), m_acceptIoCtxList.end(),
+        [](IoContext* pIoCtx) {
+        int ret = CancelIoEx((HANDLE)pIoCtx->m_socket, &pIoCtx->m_overlapped);
+        if (0 == ret)
+        {
+            cout << "CancelIoEx failed with error: " << WSAGetLastError() << endl;
+            return false;
+        }
+        closesocket(pIoCtx->m_socket);
+        pIoCtx->m_socket = INVALID_SOCKET;
+
+        while (!HasOverlappedIoCompleted(&pIoCtx->m_overlapped))
+            Sleep(1);
+
+        delete pIoCtx;
+    });
+    m_acceptIoCtxList.clear();
+
+
+    return false;
 }
 
 unsigned WINAPI IocpServer::IocpWorkerThread(LPVOID arg)
 {
     IocpServer* pThis = static_cast<IocpServer*>(arg);
 
+    int             ret;
     DWORD           dwBytes;
+    ULONG_PTR       lpCompletionKey;
+    LPOVERLAPPED    lpOverlapped = nullptr;
     ClientContext*  pClientCtx = nullptr;
     IoContext*      pIoCtx = nullptr;
 
     while (WAIT_OBJECT_0 != WaitForSingleObject(pThis->m_hExitEvent, 0))
     {
-        int ret = GetQueuedCompletionStatus(pThis->m_hComPort, &dwBytes, 
-            (PULONG_PTR)&pClientCtx, (LPOVERLAPPED*)&pIoCtx, INFINITE);
-        if (EXIT_THREAD == pClientCtx)
+        ret = GetQueuedCompletionStatus(pThis->m_hComPort, &dwBytes, 
+            &lpCompletionKey, &lpOverlapped, INFINITE);
+        if (EXIT_THREAD == lpCompletionKey)
         {
             //退出工作线程
-            cout << "exit" << endl;
+            cout << "EXIT_THREAD" << endl;
             break;
         }
         if (0 == ret)
@@ -133,6 +171,14 @@ unsigned WINAPI IocpServer::IocpWorkerThread(LPVOID arg)
             cout << "GetQueuedCompletionStatus failed with error: " << WSAGetLastError() << endl;
             return 0;
         }
+        //shutdown状态则停止接受连接
+        if (pThis->m_bIsShutdown && lpCompletionKey == (ULONG_PTR)pThis)
+        {
+            continue;
+        }
+
+        pClientCtx = (ClientContext*)lpCompletionKey;
+        pIoCtx = (IoContext*)lpOverlapped;
 
         pIoCtx->m_dwBytesTransferred = dwBytes;
         if (0 == pIoCtx->m_dwBytesTransferred)
@@ -331,7 +377,6 @@ bool IocpServer::initAcceptIoContext()
         m_acceptIoCtxList.emplace_back(pListenIoCtx);
         if (!postAccept(pListenIoCtx))
         {
-            stop();
             return false;
         }
     }
@@ -371,6 +416,8 @@ bool IocpServer::postAccept(IoContext* pIoCtx)
 
 bool IocpServer::postRecv(IoContext* pIoCtx)
 {
+
+
     pIoCtx->resetBuffer();
 
     DWORD dwBytes;
@@ -416,6 +463,7 @@ bool IocpServer::handleAccept(ClientContext* pListenClient, IoContext* pIoCtx)
 {
     Net::updateAcceptContext(pListenClient->m_socket, pIoCtx->m_socket);
 
+    //达到最大连接数则关闭新的socket
     if (m_nConnClientCnt == m_nMaxConnClientCnt)
     {
         closesocket(pIoCtx->m_socket);
@@ -450,7 +498,6 @@ bool IocpServer::handleAccept(ClientContext* pListenClient, IoContext* pIoCtx)
     ClientContext* pConnClient = new ClientContext(pIoCtx->m_socket);
     memcpy_s(&pConnClient->m_addr, peerAddrLen, peerAddr, peerAddrLen);
 
-    //关联新连接的socket与完成端口，只有关联了，才能收到该socket的IO完成通知，GetQueuedCompletionStatus才能取回包
     if (NULL == associateWithCompletionPort(pConnClient->m_socket, (ULONG_PTR)pConnClient))
     {
         return false;
@@ -459,17 +506,13 @@ bool IocpServer::handleAccept(ClientContext* pListenClient, IoContext* pIoCtx)
     ////开启心跳机制
     //setKeepAlive(pConnClient->m_socket, pIoCtx);
 
-    /**
-    * 将第一次接收到的数据拷贝到ClientContext::m_inBuf
-    * 此处不加锁，因为现在还没有其它线程访问m_inBuf
-    */
     pConnClient->appendToBuffer(pBuf, pIoCtx->m_dwBytesTransferred);
 
     //投递一个新的accpet请求
     postAccept(pIoCtx);
 
     //将客户端加入连接列表
-    addClient(pConnClient);
+    addClientContext(pConnClient);
 
     ////解数据包
     //pConnClient->decodePacket();
@@ -477,8 +520,8 @@ bool IocpServer::handleAccept(ClientContext* pListenClient, IoContext* pIoCtx)
     echo(pConnClient);
 
     //投递recv请求
-    IoContext* pRecvIoCtx = IoContext::newIoContext(PostType::RECV_EVENT, pConnClient->m_socket);
-    postRecv(pRecvIoCtx);
+    //IoContext* pRecvIoCtx = IoContext::newIoContext(PostType::RECV_EVENT, pConnClient->m_socket);
+    postRecv(pConnClient->m_recvIoCtx);
 
     return true;
 }
@@ -525,40 +568,58 @@ bool IocpServer::handleParse(ClientContext* pConnClient, IoContext* pIoCtx)
 
 bool IocpServer::handleClose(ClientContext* pConnClient, IoContext* pIoCtx)
 {
-    removeClient(pConnClient);
-    delete pConnClient;
+    CloseClient(pConnClient);
+    removeClientContext(pConnClient);
     return true;
 }
 
-void IocpServer::addClient(ClientContext* pConnClient)
+void IocpServer::addClientContext(ClientContext* pConnClient)
 {
-    EnterCriticalSection(&m_csConnList);
+    LockGuard lk(&m_csConnList);
     m_connList.emplace_back(pConnClient);
-    LeaveCriticalSection(&m_csConnList);
 }
 
-void IocpServer::removeClient(ClientContext* pConnClient)
+void IocpServer::removeClientContext(ClientContext* pConnClient)
 {
-    if (1/*graceful*/)
-    {
-        if (!Net::setLinger(pConnClient->m_socket))
-            return;
-    }
-
-
-    EnterCriticalSection(&m_csConnList);
+    LockGuard lk(&m_csConnList);
     m_connList.remove(pConnClient);
     delete pConnClient;
-    LeaveCriticalSection(&m_csConnList);
 }
 
-void IocpServer::removeClients()
+void IocpServer::removeAllClientContext()
 {
-    EnterCriticalSection(&m_csConnList);
+    LockGuard lk(&m_csConnList);
     for_each(m_connList.begin(), m_connList.end(),
         [](ClientContext* it) { delete it; });
     m_connList.erase(m_connList.begin(), m_connList.end());
-    LeaveCriticalSection(&m_csConnList);
+}
+
+void IocpServer::CloseClient(ClientContext* pConnClient)
+{
+    SOCKET s;
+
+    {
+        LockGuard lk(&pConnClient->m_cs);
+        s = pConnClient->m_socket;
+        pConnClient->m_socket = INVALID_SOCKET;
+    }
+
+    if (INVALID_SOCKET != s)
+    {
+        if (!Net::setLinger(s))
+            return;
+
+        int ret = CancelIoEx((HANDLE)s, NULL);
+        if (0 == ret)
+        {
+            cout << "CancelIoEx failed with error: " << WSAGetLastError() << endl;
+            return;
+        }
+
+        closesocket(s);
+
+        InterlockedDecrement(&m_nConnClientCnt);
+    }
 }
 
 bool IocpServer::decodePacket()

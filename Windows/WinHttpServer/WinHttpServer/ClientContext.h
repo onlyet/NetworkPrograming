@@ -44,6 +44,8 @@ struct ClientContext
 
     //CONDITION_VARIABLE      m_cvInBuf;
     //Buffer                  m_inBuf;
+
+    CRITICAL_SECTION                    m_cs;
 };
 
 

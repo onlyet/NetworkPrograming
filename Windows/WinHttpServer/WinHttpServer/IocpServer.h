@@ -12,13 +12,14 @@ class IocpServer
 {
 public:
 
-    IocpServer(short listenPort);
+    IocpServer(short listenPort, int maxConnectionCount = 10000);
     IocpServer(const IocpServer&) = delete;
     IocpServer& operator=(const IocpServer&) = delete;
     ~IocpServer();
 
     bool start();
     bool stop();
+    bool shutdown();
     //bool init();
     //bool unInit();
 
@@ -48,9 +49,10 @@ protected:
     bool handleClose(ClientContext* pConnClient, IoContext* pIoCtx);
 
     //线程安全
-    void addClient(ClientContext* pConnClient);
-    void removeClient(ClientContext* pConnClient);
-    void removeClients();
+    void addClientContext(ClientContext* pConnClient);
+    void removeClientContext(ClientContext* pConnClient);
+    void removeAllClientContext();
+    void CloseClient(ClientContext* pConnClient);
 
     bool decodePacket();
 
@@ -58,6 +60,8 @@ protected:
 
 
 private:
+    bool                        m_bIsShutdown;          //关闭时，退出工作线程
+
     short                       m_listenPort;
     HANDLE                      m_hComPort;              //完成端口
     HANDLE                      m_hExitEvent;           //退出线程事件
