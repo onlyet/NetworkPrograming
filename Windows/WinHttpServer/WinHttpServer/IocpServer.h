@@ -38,8 +38,8 @@ protected:
     bool initAcceptIoContext();
 
     bool postAccept(IoContext* pIoCtx);
-    bool postRecv(IoContext* pIoCtx);
-    bool postSend(IoContext* pIoCtx);
+    PostResult postRecv(ClientContext* pConnClient);
+    PostResult postSend(ClientContext* pConnClient);
     bool postParse(ClientContext* pConnClient, IoContext* pIoCtx);
 
     bool handleAccept(ClientContext* pListenClient, IoContext* pIoCtx);

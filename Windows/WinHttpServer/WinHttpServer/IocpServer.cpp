@@ -22,7 +22,6 @@ IocpServer::IocpServer(short listenPort, int maxConnectionCount) :
     , m_hComPort(NULL)
     , m_hExitEvent(NULL)
     , m_listenPort(listenPort)
-    //, m_pListenClient(nullptr)
     , m_pListenCtx(nullptr)
     , m_nWorkerCnt(0)
     , m_nConnClientCnt(0)
@@ -291,7 +290,6 @@ bool IocpServer::setKeepAlive(SOCKET s, IoContext* pIoCtx, int time, int interva
 
 bool IocpServer::createListenClient(short listenPort)
 {
-    //m_pListenClient = new ClientContext(listenSocket);
     m_pListenCtx = new ListenContext(listenPort);
 
     //创建完成端口
@@ -414,39 +412,54 @@ bool IocpServer::postAccept(IoContext* pIoCtx)
     return true;
 }
 
-bool IocpServer::postRecv(IoContext* pIoCtx)
+PostResult IocpServer::postRecv(ClientContext* pConnClient)
 {
-
-
+    PostResult result = PostResult::PostResultSuccesful;
+    IoContext* pIoCtx = pConnClient->m_recvIoCtx;
     pIoCtx->resetBuffer();
 
-    DWORD dwBytes;
-    //设置这个标志，则没收完的数据下一次接收
-    DWORD flag = MSG_PARTIAL;
-    int ret = WSARecv(pIoCtx->m_socket, &pIoCtx->m_wsaBuf, 1,
-        &dwBytes, &flag, &pIoCtx->m_overlapped, NULL);
-    if (SOCKET_ERROR == ret && WSA_IO_PENDING != WSAGetLastError())
+    LockGuard lk(&pConnClient->m_csLock);
+    if (INVALID_SOCKET != pConnClient->m_socket)
     {
-        cout << "WSARecv failed with error: " << WSAGetLastError() << endl;
-        return false;
+        DWORD dwBytes;
+        //设置这个标志，则没收完的数据下一次接收
+        DWORD flag = MSG_PARTIAL;
+        int ret = WSARecv(pIoCtx->m_socket, &pIoCtx->m_wsaBuf, 1,
+            &dwBytes, &flag, &pIoCtx->m_overlapped, NULL);
+        if (SOCKET_ERROR == ret && WSA_IO_PENDING != WSAGetLastError())
+        {
+            cout << "WSARecv failed with error: " << WSAGetLastError() << endl;
+            result = PostResult::PostResultFailed;
+        }
     }
-    return true;
+    return result;
 }
 
-bool IocpServer::postSend(IoContext* pIoCtx)
+PostResult IocpServer::postSend(ClientContext* pConnClient)
 {
+    PostResult result = PostResult::PostResultSuccesful;
     DWORD dwBytesSent;
     DWORD flag = MSG_PARTIAL;
-    int ret = WSASend(pIoCtx->m_socket, &pIoCtx->m_wsaBuf, 1, &dwBytesSent,
-        flag, &pIoCtx->m_overlapped, NULL);
-    if (SOCKET_ERROR == ret && WSA_IO_PENDING != WSAGetLastError())
+    IoContext* pSendIoCtx = pConnClient->m_sendIoCtx;
+
+    pSendIoCtx->m_wsaBuf.buf = pConnClient->m_outBuf.begin();
+    pSendIoCtx->m_wsaBuf.len = pConnClient->m_outBuf.size();
+
+    LockGuard lk(&pConnClient->m_csLock);
+    if (INVALID_SOCKET != pConnClient->m_socket)
     {
-        cout << "WSASend failed with error: " << WSAGetLastError() << endl;
-        return false;
+        int ret = WSASend(pSendIoCtx->m_socket, &pSendIoCtx->m_wsaBuf, 1, &dwBytesSent,
+            flag, &pSendIoCtx->m_overlapped, NULL);
+        if (SOCKET_ERROR == ret && WSA_IO_PENDING != WSAGetLastError())
+        {
+            cout << "WSASend failed with error: " << WSAGetLastError() << endl;
+            result = PostResult::PostResultFailed;
+        }
     }
-    return true;
+    return result;
 }
 
+#ifdef 0
 bool IocpServer::postParse(ClientContext* pConnClient, IoContext* pIoCtx)
 {
     DWORD dwTransferred = pIoCtx->m_wsaBuf.len;
@@ -458,6 +471,7 @@ bool IocpServer::postParse(ClientContext* pConnClient, IoContext* pIoCtx)
     }
     return true;
 }
+#endif
 
 bool IocpServer::handleAccept(ClientContext* pListenClient, IoContext* pIoCtx)
 {
@@ -521,7 +535,12 @@ bool IocpServer::handleAccept(ClientContext* pListenClient, IoContext* pIoCtx)
 
     //投递recv请求
     //IoContext* pRecvIoCtx = IoContext::newIoContext(PostType::RECV_EVENT, pConnClient->m_socket);
-    postRecv(pConnClient->m_recvIoCtx);
+    PostResult result = postRecv(pConnClient);
+    if (PostResult::PostResultFailed == result)
+    {
+        CloseClient(pConnClient);
+        removeClientContext(pConnClient);
+    }
 
     return true;
 }
@@ -544,7 +563,12 @@ bool IocpServer::handleRecv(ClientContext* pConnClient, IoContext* pIoCtx)
     echo(pConnClient);
 
     //投递recv请求
-    postRecv(pIoCtx);
+    PostResult result = postRecv(pConnClient);
+    if (PostResult::PostResultFailed == result)
+    {
+        CloseClient(pConnClient);
+        removeClientContext(pConnClient);
+    }
 
     return true;
 }
@@ -554,17 +578,23 @@ bool IocpServer::handleSend(ClientContext* pConnClient, IoContext* pIoCtx)
     return true;
 }
 
+#ifdef 0
 bool IocpServer::handleParse(ClientContext* pConnClient, IoContext* pIoCtx)
 {
     //解析数据包，加锁
     //DataPacket::parse(pConnClient);
 
     //投递send请求
-    IoContext* pRecvIoCtx = IoContext::newIoContext(PostType::SEND_EVENT);
-    postSend(pRecvIoCtx);
+    PostResult result = postSend(pConnClient);
+    if (PostResult::PostResultFailed == result)
+    {
+        CloseClient(pConnClient);
+        removeClientContext(pConnClient);
+    }
 
     return true;
 }
+#endif
 
 bool IocpServer::handleClose(ClientContext* pConnClient, IoContext* pIoCtx)
 {
@@ -599,7 +629,7 @@ void IocpServer::CloseClient(ClientContext* pConnClient)
     SOCKET s;
 
     {
-        LockGuard lk(&pConnClient->m_cs);
+        LockGuard lk(&pConnClient->m_csLock);
         s = pConnClient->m_socket;
         pConnClient->m_socket = INVALID_SOCKET;
     }
@@ -633,9 +663,7 @@ void IocpServer::echo(ClientContext* pConnClient)
     pConnClient->m_outBuf = pConnClient->m_inBuf;
     pConnClient->m_inBuf.consume(pConnClient->m_inBuf.size());
 
-    IoContext* pSendIoCtx = IoContext::newIoContext(PostType::SEND_EVENT);
-    pSendIoCtx->m_wsaBuf.buf = pConnClient->m_outBuf.begin();
-    pSendIoCtx->m_wsaBuf.len = pConnClient->m_outBuf.size();
-    postSend(pSendIoCtx);
+
+    postSend(pConnClient);
 }
 

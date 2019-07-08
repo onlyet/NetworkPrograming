@@ -15,4 +15,11 @@ enum PostType
     CLOSE_EVENT,
 };
 
+enum PostResult
+{
+    PostResultSuccesful,
+    PostResultFailed,
+    PostResultInvalid,
+};
+
 #endif // !__GLOBAL_H__
