@@ -373,7 +373,8 @@ bool IocpServer::initAcceptIoContext()
     {
         IoContext* pListenIoCtx = IoContext::newIoContext(PostType::ACCEPT_EVENT);
 
-        pListenIoCtx->newBuffer();
+        //pListenIoCtx->newBuffer();
+        pListenIoCtx->m_wsaBuf.buf = 
 
         m_acceptIoCtxList.emplace_back(pListenIoCtx);
         if (!postAccept(pListenIoCtx))
