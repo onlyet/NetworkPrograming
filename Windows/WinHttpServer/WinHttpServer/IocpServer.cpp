@@ -372,6 +372,9 @@ bool IocpServer::initAcceptIoContext()
     for (int i = 0; i < POST_ACCEPT_CNT; ++i)
     {
         IoContext* pListenIoCtx = IoContext::newIoContext(PostType::ACCEPT_EVENT);
+
+        pListenIoCtx->newBuffer();
+
         m_acceptIoCtxList.emplace_back(pListenIoCtx);
         if (!postAccept(pListenIoCtx))
         {
@@ -416,6 +419,9 @@ PostResult IocpServer::postRecv(ClientContext* pConnClient)
 {
     PostResult result = PostResult::PostResultSuccesful;
     IoContext* pIoCtx = pConnClient->m_recvIoCtx;
+
+    pIoCtx->newBuffer();
+
     pIoCtx->resetBuffer();
 
     LockGuard lk(&pConnClient->m_csLock);
@@ -442,8 +448,11 @@ PostResult IocpServer::postSend(ClientContext* pConnClient)
     DWORD flag = MSG_PARTIAL;
     IoContext* pSendIoCtx = pConnClient->m_sendIoCtx;
 
-    pSendIoCtx->m_wsaBuf.buf = pConnClient->m_outBuf.begin();
-    pSendIoCtx->m_wsaBuf.len = pConnClient->m_outBuf.size();
+    pSendIoCtx->newBuffer();
+    pSendIoCtx->m_buf = pConnClient->m_recvIoCtx->m_buf;
+
+    //pSendIoCtx->m_wsaBuf.buf = pConnClient->m_outBuf.begin();
+    //pSendIoCtx->m_wsaBuf.len = pConnClient->m_outBuf.size();
 
     LockGuard lk(&pConnClient->m_csLock);
     if (INVALID_SOCKET != pConnClient->m_socket)
@@ -459,7 +468,7 @@ PostResult IocpServer::postSend(ClientContext* pConnClient)
     return result;
 }
 
-#ifdef 0
+#if 0
 bool IocpServer::postParse(ClientContext* pConnClient, IoContext* pIoCtx)
 {
     DWORD dwTransferred = pIoCtx->m_wsaBuf.len;
@@ -534,7 +543,6 @@ bool IocpServer::handleAccept(ClientContext* pListenClient, IoContext* pIoCtx)
     echo(pConnClient);
 
     //投递recv请求
-    //IoContext* pRecvIoCtx = IoContext::newIoContext(PostType::RECV_EVENT, pConnClient->m_socket);
     PostResult result = postRecv(pConnClient);
     if (PostResult::PostResultFailed == result)
     {
@@ -578,7 +586,7 @@ bool IocpServer::handleSend(ClientContext* pConnClient, IoContext* pIoCtx)
     return true;
 }
 
-#ifdef 0
+#if 0
 bool IocpServer::handleParse(ClientContext* pConnClient, IoContext* pIoCtx)
 {
     //解析数据包，加锁
@@ -660,9 +668,13 @@ bool IocpServer::decodePacket()
 
 void IocpServer::echo(ClientContext* pConnClient)
 {
-    pConnClient->m_outBuf = pConnClient->m_inBuf;
-    pConnClient->m_inBuf.consume(pConnClient->m_inBuf.size());
+    //pConnClient->m_outBuf = pConnClient->m_inBuf;
+    //pConnClient->m_inBuf.consume(pConnClient->m_inBuf.size());
 
+    IoContext* pSendIoCtx = pConnClient->m_sendIoCtx;
+    pSendIoCtx->m_buf = new Buffer();
+    //pSendIoCtx->m_wsaBuf.buf = (char*)pSendIoCtx->m_buf->begin();
+    //pSendIoCtx->m_wsaBuf.len = pSendIoCtx->m_buf->length();
 
     postSend(pConnClient);
 }

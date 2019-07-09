@@ -3,6 +3,7 @@
 
 #include <list>
 #include <vector>
+#include "Global.h"
 
 struct ListenContext;
 struct IoContext;

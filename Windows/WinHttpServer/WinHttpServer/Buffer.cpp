@@ -1,182 +1,182 @@
 #include "pch.h"
 #include "Buffer.h"
-#include <algorithm>
+#include <math.h>
 
-Buffer::Buffer() : 
-    buf_(NULL), b_(0), e_(0), cap_(0), exp_(512)
+Buffer::Buffer()
+    : m_pBegin(nullptr)
+    , m_pEnd(nullptr)
+    , m_nSize(0)
 {
 }
 
 Buffer::~Buffer()
 {
-    delete[] buf_;
+    if (m_pBegin)
+        VirtualFree(m_pBegin, 0, MEM_RELEASE);
 }
 
 void Buffer::clear()
 {
-    /*if (buf_ == nullptr)
-    LDebug("buf_ == nullptr");*/
-    delete[] buf_;
-    buf_ = NULL;
-    cap_ = 0;
-    b_ = e_ = 0;
+    m_pEnd = m_pBegin;
+    deallocateBuffer(1024);
 }
 
-size_t Buffer::size() const
+UINT Buffer::remove(UINT nSize)
 {
-    return e_ - b_;
-}
+    if (nSize > getMemSize())
+        return 0;
 
-bool Buffer::empty() const
-{
-    return e_ == b_;
-}
+    if (nSize > getBufferLen())
+        nSize = getBufferLen();
 
-char* Buffer::data() const
-{
-    return buf_ + b_;
-}
-
-char* Buffer::begin() const
-{
-    return buf_ + b_;
-}
-
-char* Buffer::end() const
-{
-    return buf_ + e_;
-}
-
-char* Buffer::makeRoom(size_t len)
-{
-    if (e_ + len <= cap_) {
-    }
-    else if (size() + len < cap_ / 2)
-        moveHead();
-    else
-        expand(len);
-
-    return end();
-}
-
-void Buffer::makeRoom()
-{
-    if (space() < exp_)
-        expand(0);
-}
-
-size_t Buffer::space() const
-{
-    return cap_ - e_;
-}
-
-void Buffer::addSize(size_t len)
-{
-    e_ += len;
-}
-
-char* Buffer::allocRoom(size_t len)
-{
-    char *p = makeRoom(len);
-    addSize(len);
-    return p;
-}
-
-Buffer& Buffer::append(const char* p, size_t len)
-{
-    memcpy(allocRoom(len), p, len);
-    return *this;
-}
-
-Buffer& Buffer::append(std::string s)
-{
-    return append(s.data(), s.size());
-}
-
-Buffer& Buffer::append(Slice slice)
-{
-    return append(slice.data(), slice.size());
-}
-
-Buffer& Buffer::append(const char* p)
-{
-    return append(p, strlen(p));
-}
-
-Buffer& Buffer::consume(size_t len)
-{
-    b_ += len;
-    if (size() == 0)
-        clear();
-    return *this;
-}
-
-Buffer& Buffer::absorb(Buffer& buf)
-{
-    if (&buf != this)
+    if (nSize)
     {
-        if (size() == 0)
-        {
-            char b[sizeof buf];
-            memcpy(b, this, sizeof b);
-            memcpy(this, &buf, sizeof b);
-            memcpy(&buf, b, sizeof b);
-            std::swap(exp_, buf.exp_);  // keep the origin exp_
-        }
-        else
-        {
-            append(buf.begin(), buf.size());
-            buf.clear();
-        }
+        MoveMemory(m_pBegin, m_pBegin + nSize, getMemSize() - nSize);
+        m_pEnd -= nSize;
     }
-    return *this;
+    deallocateBuffer(getBufferLen());
+    return nSize;
 }
 
-void Buffer::setSuggestSize(size_t sz)
+UINT Buffer::read(PBYTE pData, UINT nSize)
 {
-    exp_ = sz;
-}
+    if (nSize > getMemSize())
+        return 0;
 
-Buffer::Buffer(const Buffer& b)
-{
-    copyFrom(b);
-}
+    if (nSize > getBufferLen())
+        nSize = getBufferLen();
 
-Buffer& Buffer::operator=(const Buffer& b)
-{
-    if (this == &b)
-        return *this;
-    delete[] buf_;
-    buf_ = NULL;
-    copyFrom(b);
-    return *this;
-}
-
-void Buffer::moveHead()
-{
-    //_DEPRECATE_UNCHECKED
-    std::copy(begin(), end(), buf_);
-    e_ -= b_; b_ = 0;
-}
-
-void Buffer::expand(size_t len)
-{
-    size_t ncap = std::max(exp_, std::max(2 * cap_, size() + len));
-    char *p = new char[ncap];
-    std::copy(begin(), end(), p);
-    e_ -= b_;
-    b_ = 0;
-    delete[] buf_;
-    buf_ = p;
-    cap_ = ncap;
-}
-
-void Buffer::copyFrom(const Buffer& b)
-{
-    memcpy(this, &b, sizeof b);
-    if (b.buf_)
+    if (nSize)
     {
-        buf_ = new char[cap_];
-        memcpy(data(), b.begin(), b.size());
+        CopyMemory(pData, m_pBegin, nSize);
+        MoveMemory(m_pBegin, m_pBegin + nSize, getMemSize() - nSize);
+        m_pEnd -= nSize;
     }
+    deallocateBuffer(getBufferLen());
+    return nSize;
+}
+
+BOOL Buffer::write(PBYTE pData, UINT nSize)
+{
+    reallocateBuffer(nSize + getBufferLen());
+    CopyMemory(m_pEnd, pData, nSize);
+
+    m_pEnd += nSize;
+
+    return nSize;
+}
+
+BOOL Buffer::write(const std::string& s)
+{
+    int nSize = s.size();
+    return write((PBYTE)s.c_str(), nSize);
+}
+
+int Buffer::scan(PBYTE pScan, UINT nPos)
+{
+    if (nPos > getBufferLen())
+        return -1;
+
+    PBYTE pStr = (PBYTE)strstr((char*)(m_pBegin + nPos), (char*)pScan);
+    int nOffset = 0;
+
+    if (pStr)
+        nOffset = (pStr - m_pBegin) + strlen((char*)pScan);
+
+    return nOffset;
+}
+
+BOOL Buffer::insert(PBYTE pData, UINT nSize)
+{
+    reallocateBuffer(nSize + getBufferLen());
+
+    MoveMemory(m_pBegin + nSize, m_pBegin, getMemSize() - nSize);
+    CopyMemory(m_pBegin, pData, nSize);
+
+    m_pEnd += nSize;
+
+    return nSize;
+}
+
+BOOL Buffer::insert(const std::string& s)
+{
+    int nSize = s.size();
+    return insert((PBYTE)s.c_str(), nSize);
+}
+
+void Buffer::copy(Buffer& buf)
+{
+    int nReSize = buf.getMemSize();
+    int nSize = buf.getBufferLen();
+    clear();
+    reallocateBuffer(nReSize);
+
+    m_pEnd = m_pBegin + nSize;
+
+    CopyMemory(m_pBegin, buf.getBuffer(), buf.getBufferLen());
+}
+
+PBYTE Buffer::getBuffer(UINT nPos)
+{
+    return m_pBegin + nPos;
+}
+
+void Buffer::writeFile(const std::string& fileName)
+{
+}
+
+UINT Buffer::getBufferLen()
+{
+    if (nullptr == m_pBegin)
+        return 0;
+
+    int nSize = m_pEnd - m_pBegin;
+    return nSize;
+}
+
+UINT Buffer::reallocateBuffer(UINT nSize)
+{
+    if (nSize < getMemSize())
+        return 0;
+
+    //ÄÚ´æ¶ÔÆë
+    UINT nNewSize = (UINT)ceil(nSize / 1024.0) * 1024;
+    PBYTE pNewBuffer = (PBYTE)VirtualAlloc(NULL, nNewSize, MEM_COMMIT, PAGE_READWRITE);
+
+    UINT nBufferLen = getBufferLen();
+    CopyMemory(pNewBuffer, m_pBegin, nBufferLen);
+
+    if (m_pBegin)
+        VirtualFree(m_pBegin, 0, MEM_RELEASE);
+
+    m_pBegin = pNewBuffer;
+    m_pEnd = m_pBegin + nBufferLen;
+    m_nSize = nNewSize;
+}
+
+UINT Buffer::deallocateBuffer(UINT nSize)
+{
+    if (nSize < getBufferLen())
+        return 0;
+
+    UINT nNewSize = (UINT)ceil(nSize / 1024.0) * 1024;
+    if (nNewSize < getMemSize())
+        return 0;
+
+    PBYTE pNewBuffer = (PBYTE)VirtualAlloc(NULL, nNewSize, MEM_COMMIT, PAGE_READWRITE);
+
+    UINT nBufferLen = getBufferLen();
+    CopyMemory(pNewBuffer, m_pBegin, nBufferLen);
+
+    if (m_pBegin)
+        VirtualFree(m_pBegin, 0, MEM_RELEASE);
+
+    m_pBegin = pNewBuffer;
+    m_pEnd = m_pBegin + nBufferLen;
+    m_nSize = nNewSize;
+}
+
+UINT Buffer::getMemSize()
+{
+    return m_nSize;
 }

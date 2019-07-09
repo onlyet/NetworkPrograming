@@ -27,9 +27,6 @@
     <ClInclude Include="DataPacket.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Buffer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="ClientContext.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -46,6 +43,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="LockGuard.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Buffer_old.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Mempool.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Buffer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -71,10 +77,13 @@
     <ClCompile Include="IoContext.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Buffer.cpp">
+    <ClCompile Include="Codec.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Codec.cpp">
+    <ClCompile Include="Buffer_old.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Buffer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

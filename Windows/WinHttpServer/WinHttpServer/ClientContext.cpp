@@ -4,6 +4,7 @@
 #include "Net.h"
 #include <assert.h>
 #include "Codec.h"
+#include "Buffer.h"
 
 ListenContext::ListenContext(short port, const std::string& ip)
 {
@@ -67,7 +68,7 @@ ClientContext::~ClientContext()
 void ClientContext::appendToBuffer(const char* inBuf, size_t len)
 {
     EnterCriticalSection(&m_csInBuf);
-    m_inBuf.append(inBuf, len);
+    //m_inBuf.append(inBuf, len);
     LeaveCriticalSection(&m_csInBuf);
 }
 
@@ -81,7 +82,7 @@ bool ClientContext::decodePacket()
     Slice header;
     HttpCodec::HttpState state;
 
-    state = m_pCodec->getHeader(m_inBuf, header);
+    //state = m_pCodec->getHeader(m_inBuf, header);
     
     state = m_pCodec->decodeHeader(header);
 

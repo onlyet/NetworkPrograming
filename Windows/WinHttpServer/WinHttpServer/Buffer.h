@@ -1,64 +1,41 @@
 #ifndef __BUFFER_H__
 #define __BUFFER_H__
 
-#include "slice.h"
 #include <string>
 
-//std::copy : _DEPRECATE_UNCHECKED：在Preprocessor添加_SCL_SECURE_NO_WARNINGS
-
-class Buffer 
+class Buffer
 {
 public:
     Buffer();
-    ~Buffer();
-    Buffer(const Buffer& b);
-    Buffer& operator=(const Buffer& b);
+    virtual ~Buffer();
 
     void clear();
-    size_t size() const;
-    bool empty() const;
-    char* data() const;
-    char* begin() const;
-    char* end() const;
-    char* makeRoom(size_t len);
-    void makeRoom();
-    size_t space() const;	//缓存可用空间
-    void addSize(size_t len);
-    char* allocRoom(size_t len);
+    UINT remove(UINT nSize);
+    UINT read(PBYTE pData, UINT nSize);
+    BOOL write(PBYTE pData, UINT nSize);
+    BOOL write(const std::string& s);
+    int scan(PBYTE pScan, UINT nPos);
+    BOOL insert(PBYTE pData, UINT nSize);
+    BOOL insert(const std::string& s);
+    void copy(Buffer& buf);
+    PBYTE getBuffer(UINT nPos = 0);
+    void writeFile(const std::string& fileName);
 
-    Buffer& append(const char* p, size_t len);
-    Buffer& append(std::string s);
-    Buffer& append(Slice slice);
-    Buffer& append(const char* p);
-    template <class T>
-    Buffer& appendValue(const T& v) 
-    {
-        append((const char *)&v, sizeof v);
-        return *this;
-    }
+    //数据大小
+    UINT getBufferLen();
 
-    Buffer& consume(size_t len);
-    Buffer& absorb(Buffer& buf);
-    void setSuggestSize(size_t sz);
+protected:
+    UINT reallocateBuffer(UINT nSize);
+    UINT deallocateBuffer(UINT nSize);
+    //占用内存大小
+    UINT getMemSize();
 
-    //转换为Slice
-    operator Slice() { return Slice(data(), size()); }
-
-private:
-    //将未读数据移动到头部
-    void moveHead();
-    void expand(size_t len);	//增加buffer长度，类似于vector
-    void copyFrom(const Buffer& b);
-
-private:
-    char* buf_;
-    size_t b_;      //未读开始位置
-    size_t e_;      //未读结束位置
-    size_t cap_;    //当前缓冲区容量
-    size_t exp_;
+protected:
+    PBYTE       m_pBegin;   //缓冲区头部位置
+    PBYTE       m_pEnd;     //缓冲区尾部位置
+    UINT        m_nSize;    //Buffer占用内存大小
 };
 
 #endif // !__BUFFER_H__
 
 
-// 0 <= b <= e <= cap

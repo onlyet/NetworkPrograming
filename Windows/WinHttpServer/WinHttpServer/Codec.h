@@ -2,7 +2,7 @@
 #define __CODEC_H__
 
 #include "Slice.h"
-#include "Buffer.h"
+//#include "Buffer.h"
 
 struct CodecBase 
 {
