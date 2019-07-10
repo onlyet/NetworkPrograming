@@ -13,6 +13,7 @@ public:
     UINT remove(UINT nSize);
     UINT read(PBYTE pData, UINT nSize);
     BOOL write(PBYTE pData, UINT nSize);
+    BOOL write(PCHAR pData, UINT nSize);
     BOOL write(const std::string& s);
     int scan(PBYTE pScan, UINT nPos);
     BOOL insert(PBYTE pData, UINT nSize);

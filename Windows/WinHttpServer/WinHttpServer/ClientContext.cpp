@@ -20,8 +20,8 @@ ListenContext::ListenContext(short port, const std::string& ip)
 
 ClientContext::ClientContext(const SOCKET& socket) :
     m_socket(socket)
-    , m_recvIoCtx(new IoContext(PostType::RECV_EVENT, m_socket))
-    , m_sendIoCtx(new IoContext(PostType::SEND_EVENT, m_socket))
+    , m_recvIoCtx(new RecvIoContext())
+    , m_sendIoCtx(new IoContext(PostType::SEND_EVENT))
 {
     SecureZeroMemory(&m_addr, sizeof(SOCKADDR_IN));
 }
@@ -65,16 +65,14 @@ ClientContext::~ClientContext()
 //    m_ioCtxs.erase(pIoCtx->m_postType);
 //}
 
-void ClientContext::appendToBuffer(const char* inBuf, size_t len)
+void ClientContext::appendToBuffer(PBYTE pInBuf, size_t len)
 {
-    EnterCriticalSection(&m_csInBuf);
-    //m_inBuf.append(inBuf, len);
-    LeaveCriticalSection(&m_csInBuf);
+    m_inBuf.write((PBYTE)pInBuf, len);
 }
 
 void ClientContext::appendToBuffer(const std::string& inBuf)
 {
-    appendToBuffer(inBuf.data(), inBuf.size());
+    m_inBuf.write(inBuf);
 }
 
 bool ClientContext::decodePacket()
@@ -82,7 +80,7 @@ bool ClientContext::decodePacket()
     Slice header;
     HttpCodec::HttpState state;
 
-    //state = m_pCodec->getHeader(m_inBuf, header);
+    state = m_pCodec->getHeader(m_inBuf, header);
     
     state = m_pCodec->decodeHeader(header);
 

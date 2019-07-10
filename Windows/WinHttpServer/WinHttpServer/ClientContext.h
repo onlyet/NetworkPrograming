@@ -2,7 +2,7 @@
 #define __CLIENT_CONTEXT_H__
 
 #include "Global.h"
-//#include "Buffer.h"
+#include "Buffer.h"
 #include "Codec.h"
 #include <string>
 #include <map>
@@ -16,36 +16,29 @@ struct ListenContext
     SOCKADDR_IN     m_addr;     //监听地址
 };
 
-
 struct IoContext;
+struct RecvIoContext;
 
 struct ClientContext
 {
     ClientContext(const SOCKET& socket = INVALID_SOCKET);
     ~ClientContext();
 
-    //IoContext* getIoContext(PostType type);
-    //void removeIoContext(IoContext* pIoCtx);
-
-    void appendToBuffer(const char* inBuf, size_t len);
+    void appendToBuffer(PBYTE pInBuf, size_t len);
     void appendToBuffer(const std::string& inBuf);
 
     bool decodePacket();
 
     SOCKET                              m_socket;       //客户端socket
     SOCKADDR_IN                         m_addr;         //客户端地址
-    IoContext*                          m_recvIoCtx;
+    RecvIoContext*                      m_recvIoCtx;
     IoContext*                          m_sendIoCtx;
-    //Buffer                              m_inBuf;
-    //Buffer                              m_outBuf;
     HttpCodec*                          m_pCodec;
-    CRITICAL_SECTION                    m_csInBuf;
     CRITICAL_SECTION                    m_csLock;           //加锁，保护socket
-    BYTE                                m_recvBuf[IO_BUF_SIZE];
+    CRITICAL_SECTION                    m_csInBuf;
     Buffer                              m_inBuf;
     Buffer                              m_outBuf;
 };
-
 
 #endif // !__CLIENT_CONTEXT_H__
 

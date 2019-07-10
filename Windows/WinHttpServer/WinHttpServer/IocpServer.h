@@ -7,6 +7,7 @@
 
 struct ListenContext;
 struct IoContext;
+struct AcceptIoContext;
 struct ClientContext;
 
 class IocpServer
@@ -38,16 +39,16 @@ protected:
     bool exitIocpWorker();
     bool initAcceptIoContext();
 
-    bool postAccept(IoContext* pIoCtx);
+    bool postAccept(AcceptIoContext* pIoCtx);
     PostResult postRecv(ClientContext* pConnClient);
     PostResult postSend(ClientContext* pConnClient);
     bool postParse(ClientContext* pConnClient, IoContext* pIoCtx);
 
-    bool handleAccept(ClientContext* pListenClient, IoContext* pIoCtx);
-    bool handleRecv(ClientContext* pConnClient, IoContext* pIoCtx);
-    bool handleSend(ClientContext* pConnClient, IoContext* pIoCtx);
-    bool handleParse(ClientContext* pConnClient, IoContext* pIoCtx);
-    bool handleClose(ClientContext* pConnClient, IoContext* pIoCtx);
+    bool handleAccept(LPOVERLAPPED lpOverlapped, DWORD dwBytesTransferred);
+    bool handleRecv(ULONG_PTR lpCompletionKey, LPOVERLAPPED lpOverlapped, DWORD dwBytesTransferred);
+    bool handleSend(ULONG_PTR lpCompletionKey, LPOVERLAPPED lpOverlapped, DWORD dwBytesTransferred);
+    //bool handleParse(ULONG_PTR pConnClient, LPOVERLAPPED lpOverlapped, DWORD dwBytesTransferred);
+    bool handleClose(ULONG_PTR lpCompletionKey);
 
     //线程安全
     void addClientContext(ClientContext* pConnClient);
@@ -59,27 +60,33 @@ protected:
 
     void echo(ClientContext* pConnClient);
 
+    //回调函数
+    virtual void notifyNewConnection(ClientContext* pConnClient);
+    virtual void notifyDisconnected();
+    virtual void notifyPackageReceived();
+    virtual void notifyWritePackage();
+    virtual void notifyWriteCompleted();
 
 private:
-    bool                        m_bIsShutdown;          //关闭时，退出工作线程
+    bool                            m_bIsShutdown;          //关闭时，退出工作线程
 
-    short                       m_listenPort;
-    HANDLE                      m_hComPort;              //完成端口
-    HANDLE                      m_hExitEvent;           //退出线程事件
+    short                           m_listenPort;
+    HANDLE                          m_hComPort;              //完成端口
+    HANDLE                          m_hExitEvent;           //退出线程事件
 
-    void*                       m_lpfnAcceptEx;		    //acceptEx函数指针
-    void*                       m_lpfnGetAcceptExAddr;  //GetAcceptExSockaddrs函数指针
+    void*                           m_lpfnAcceptEx;		    //acceptEx函数指针
+    void*                           m_lpfnGetAcceptExAddr;  //GetAcceptExSockaddrs函数指针
 
-    int                         m_nWorkerCnt;           //io工作线程数量
-    DWORD                       m_nConnClientCnt;       //已连接客户端数量
-    DWORD                       m_nMaxConnClientCnt;    //最大客户端数量
+    int                             m_nWorkerCnt;           //io工作线程数量
+    DWORD                           m_nConnClientCnt;       //已连接客户端数量
+    DWORD                           m_nMaxConnClientCnt;    //最大客户端数量
 
-    ListenContext*              m_pListenCtx;            //监听上下文
-    std::list<ClientContext*>   m_connList;             //已连接客户端列表
-    CRITICAL_SECTION            m_csConnList;           //保护连接列表
+    ListenContext*                  m_pListenCtx;            //监听上下文
+    std::list<ClientContext*>       m_connList;             //已连接客户端列表
+    CRITICAL_SECTION                m_csConnList;           //保护连接列表
 
-    std::vector<HANDLE>         m_hWorkerThreads;       //工作线程句柄列表
-    std::vector<IoContext*>     m_acceptIoCtxList;      //接收连接的IO上下文列表
+    std::vector<HANDLE>             m_hWorkerThreads;       //工作线程句柄列表
+    std::vector<AcceptIoContext*>   m_acceptIoCtxList;      //接收连接的IO上下文列表
 
 };
 

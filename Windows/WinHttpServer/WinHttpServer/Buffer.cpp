@@ -66,6 +66,11 @@ BOOL Buffer::write(PBYTE pData, UINT nSize)
     return nSize;
 }
 
+BOOL Buffer::write(PCHAR pData, UINT nSize)
+{
+    return write((PBYTE)pData, nSize);
+}
+
 BOOL Buffer::write(const std::string& s)
 {
     int nSize = s.size();
@@ -152,6 +157,7 @@ UINT Buffer::reallocateBuffer(UINT nSize)
     m_pBegin = pNewBuffer;
     m_pEnd = m_pBegin + nBufferLen;
     m_nSize = nNewSize;
+    return m_nSize;
 }
 
 UINT Buffer::deallocateBuffer(UINT nSize)
@@ -174,6 +180,7 @@ UINT Buffer::deallocateBuffer(UINT nSize)
     m_pBegin = pNewBuffer;
     m_pEnd = m_pBegin + nBufferLen;
     m_nSize = nNewSize;
+    return m_nSize;
 }
 
 UINT Buffer::getMemSize()
