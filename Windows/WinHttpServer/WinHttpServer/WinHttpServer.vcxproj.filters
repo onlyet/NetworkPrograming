@@ -24,9 +24,6 @@
     <ClInclude Include="Net.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="DataPacket.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="ClientContext.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -66,9 +63,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Net.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="DataPacket.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ClientContext.cpp">

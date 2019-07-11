@@ -25,6 +25,8 @@ public:
     //bool init();
     //bool unInit();
 
+    bool send(ClientContext* pConnClient, PBYTE pData, UINT len);
+
 protected:
     //必须要static _beginthreadex才能访问
     static unsigned WINAPI IocpWorkerThread(LPVOID arg);
@@ -47,7 +49,6 @@ protected:
     bool handleAccept(LPOVERLAPPED lpOverlapped, DWORD dwBytesTransferred);
     bool handleRecv(ULONG_PTR lpCompletionKey, LPOVERLAPPED lpOverlapped, DWORD dwBytesTransferred);
     bool handleSend(ULONG_PTR lpCompletionKey, LPOVERLAPPED lpOverlapped, DWORD dwBytesTransferred);
-    //bool handleParse(ULONG_PTR pConnClient, LPOVERLAPPED lpOverlapped, DWORD dwBytesTransferred);
     bool handleClose(ULONG_PTR lpCompletionKey);
 
     //线程安全
@@ -57,6 +58,7 @@ protected:
     void CloseClient(ClientContext* pConnClient);
 
     bool decodePacket();
+    bool encodePacket();
 
     void echo(ClientContext* pConnClient);
 
@@ -71,17 +73,18 @@ private:
     bool                            m_bIsShutdown;          //关闭时，退出工作线程
 
     short                           m_listenPort;
-    HANDLE                          m_hComPort;              //完成端口
+    HANDLE                          m_hComPort;             //完成端口
     HANDLE                          m_hExitEvent;           //退出线程事件
+    HANDLE                          m_hWriteCompletedEvent; //postSend对应的写操作已完成，可以进行下一个投递
 
-    void*                           m_lpfnAcceptEx;		    //acceptEx函数指针
+    void*                           m_lpfnAcceptEx;         //acceptEx函数指针
     void*                           m_lpfnGetAcceptExAddr;  //GetAcceptExSockaddrs函数指针
 
     int                             m_nWorkerCnt;           //io工作线程数量
     DWORD                           m_nConnClientCnt;       //已连接客户端数量
     DWORD                           m_nMaxConnClientCnt;    //最大客户端数量
 
-    ListenContext*                  m_pListenCtx;            //监听上下文
+    ListenContext*                  m_pListenCtx;           //监听上下文
     std::list<ClientContext*>       m_connList;             //已连接客户端列表
     CRITICAL_SECTION                m_csConnList;           //保护连接列表
 

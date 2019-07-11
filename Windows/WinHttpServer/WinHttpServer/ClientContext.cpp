@@ -77,12 +77,12 @@ void ClientContext::appendToBuffer(const std::string& inBuf)
 
 bool ClientContext::decodePacket()
 {
-    Slice header;
-    HttpCodec::HttpState state;
+    //Slice header;
+    //HttpCodec::HttpState state;
 
-    state = m_pCodec->getHeader(m_inBuf, header);
-    
-    state = m_pCodec->decodeHeader(header);
+    //state = m_pCodec->getHeader(m_inBuf, header);
+    //
+    //state = m_pCodec->decodeHeader(header);
 
 
     return false;

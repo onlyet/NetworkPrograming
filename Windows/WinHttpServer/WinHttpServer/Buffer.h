@@ -10,6 +10,7 @@ public:
     virtual ~Buffer();
 
     void clear();
+    //相当于consume，跟consume不同，remove每次都要更换内存
     UINT remove(UINT nSize);
     UINT read(PBYTE pData, UINT nSize);
     BOOL write(PBYTE pData, UINT nSize);
@@ -32,7 +33,7 @@ protected:
     UINT getMemSize();
 
 protected:
-    PBYTE       m_pBegin;   //缓冲区头部位置
+    PBYTE       m_pBegin;   //缓冲区头部位置，固定不移动
     PBYTE       m_pEnd;     //缓冲区尾部位置
     UINT        m_nSize;    //Buffer占用内存大小
 };

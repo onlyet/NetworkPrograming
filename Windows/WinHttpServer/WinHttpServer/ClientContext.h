@@ -7,6 +7,7 @@
 #include <string>
 #include <map>
 #include <algorithm>
+#include <queue>
 
 struct ListenContext
 {
@@ -34,10 +35,10 @@ struct ClientContext
     RecvIoContext*                      m_recvIoCtx;
     IoContext*                          m_sendIoCtx;
     HttpCodec*                          m_pCodec;
-    CRITICAL_SECTION                    m_csLock;           //加锁，保护socket
-    CRITICAL_SECTION                    m_csInBuf;
     Buffer                              m_inBuf;
-    Buffer                              m_outBuf;
+    //Buffer                              m_outBuf;
+    std::queue<Buffer>                  m_outBufList;
+    CRITICAL_SECTION                    m_csLock;       //加锁，保护socket，链表
 };
 
 #endif // !__CLIENT_CONTEXT_H__

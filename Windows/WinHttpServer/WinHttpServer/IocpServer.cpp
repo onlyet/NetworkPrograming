@@ -3,7 +3,6 @@
 #include "Net.h"
 #include "IoContext.h"
 #include "ClientContext.h"
-//#include "DataPacket.h"
 #include "LockGuard.h"
 
 #include <iostream>
@@ -23,17 +22,27 @@ IocpServer::IocpServer(short listenPort, int maxConnectionCount) :
     m_bIsShutdown(false)
     , m_hComPort(NULL)
     , m_hExitEvent(NULL)
+    , m_hWriteCompletedEvent(NULL)
     , m_listenPort(listenPort)
     , m_pListenCtx(nullptr)
     , m_nWorkerCnt(0)
     , m_nConnClientCnt(0)
     , m_nMaxConnClientCnt(maxConnectionCount)
 {
+    //手动reset，初始状态为nonsignaled
     m_hExitEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
     if (WSA_INVALID_EVENT == m_hExitEvent)
     {
         cout << "CreateEvent failed with error: " << WSAGetLastError() << endl;
     }
+
+    //自动reset，初始状态为signaled
+    m_hWriteCompletedEvent = CreateEvent(NULL, FALSE, TRUE, NULL);
+    if (WSA_INVALID_EVENT == m_hExitEvent)
+    {
+        cout << "CreateEvent failed with error: " << WSAGetLastError() << endl;
+    }
+
     InitializeCriticalSection(&m_csConnList);
 }
 
@@ -146,6 +155,25 @@ bool IocpServer::shutdown()
     return false;
 }
 
+bool IocpServer::send(ClientContext* pConnClient, PBYTE pData, UINT len)
+{
+    Buffer sendBuf;
+    sendBuf.write(pData, len);
+
+
+    LockGuard lk(&pConnClient->m_csLock);
+    pConnClient->m_outBufList.push(sendBuf);
+
+
+    //if(pConnClient->m_outBufList.empty())
+
+    //int ret = WaitForSingleObject(m_hWriteCompletedEvent, INFINITE);
+
+    PostQueuedCompletionStatus(m_hComPort, 0, (ULONG_PTR)pConnClient, &pConnClient->m_sendIoCtx->m_overlapped);
+
+    return false;
+}
+
 unsigned WINAPI IocpServer::IocpWorkerThread(LPVOID arg)
 {
     IocpServer* pThis = static_cast<IocpServer*>(arg);
@@ -173,8 +201,11 @@ unsigned WINAPI IocpServer::IocpWorkerThread(LPVOID arg)
             pThis->handleClose(lpCompletionKey);
             continue;
         }
+
+        IoContext* pIoCtx = (IoContext*)lpOverlapped;
+
         //对端关闭
-        if (0 == dwBytesTransferred)
+        if (0 == dwBytesTransferred && 5 != pIoCtx->m_postType)
         {
             pThis->handleClose(lpCompletionKey);
             continue;
@@ -185,13 +216,6 @@ unsigned WINAPI IocpServer::IocpWorkerThread(LPVOID arg)
         {
             continue;
         }
-
-        if (lpCompletionKey == (ULONG_PTR)pThis)
-        {
-            cout << "111" << endl;
-        }
-        IoContext* pIoCtx = (IoContext*)lpOverlapped;
-        AcceptIoContext* pAcceptIoCtx = (AcceptIoContext*)lpOverlapped;
 
         switch (pIoCtx->m_postType)
         {
@@ -396,13 +420,8 @@ bool IocpServer::postAccept(AcceptIoContext* pAcceptIoCtx)
     PCHAR pBuf = pAcceptIoCtx->m_wsaBuf.buf;
     ULONG nLen = pAcceptIoCtx->m_wsaBuf.len - ACCEPT_ADDRS_SIZE;
 
- /*   cout << (int)pAcceptIoCtx << endl;
-    cout << (int)&pAcceptIoCtx->m_overlapped << endl;
-    cout << (int)&pAcceptIoCtx->m_postType << endl;
-    cout << (int)&pAcceptIoCtx->m_wsaBuf << endl;*/
-
-    //LPOVERLAPPED pOverlapped = &pAcceptIoCtx->m_overlapped;
-    LPOVERLAPPED pOverlapped = (LPOVERLAPPED)pAcceptIoCtx;
+    LPOVERLAPPED pOverlapped = &pAcceptIoCtx->m_overlapped;
+    //LPOVERLAPPED pOverlapped = (LPOVERLAPPED)pAcceptIoCtx;
     LPFN_ACCEPTEX lpfnAcceptEx = (LPFN_ACCEPTEX)m_lpfnAcceptEx;
 
     //创建用于接受连接的socket
@@ -443,9 +462,9 @@ PostResult IocpServer::postRecv(ClientContext* pConnClient)
     {
         DWORD dwBytes;
         //设置这个标志，则没收完的数据下一次接收
-        DWORD flag = MSG_PARTIAL;
+        DWORD dwFlag = MSG_PARTIAL;
         int ret = WSARecv(pConnClient->m_socket, &pRecvIoCtx->m_wsaBuf, 1,
-            &dwBytes, &flag, &pRecvIoCtx->m_overlapped, NULL);
+            &dwBytes, &dwFlag, &pRecvIoCtx->m_overlapped, NULL);
         if (SOCKET_ERROR == ret && WSA_IO_PENDING != WSAGetLastError())
         {
             cout << "WSARecv failed with error: " << WSAGetLastError() << endl;
@@ -460,17 +479,13 @@ PostResult IocpServer::postSend(ClientContext* pConnClient)
     PostResult result = PostResult::PostResultSuccesful;
     IoContext* pSendIoCtx = pConnClient->m_sendIoCtx;
 
-    //pSendIoCtx->m_buf = pConnClient->m_recvIoCtx->m_buf;
-    //pSendIoCtx->m_wsaBuf.buf = pConnClient->m_outBuf.begin();
-    //pSendIoCtx->m_wsaBuf.len = pConnClient->m_outBuf.size();
-
     LockGuard lk(&pConnClient->m_csLock);
     if (INVALID_SOCKET != pConnClient->m_socket)
     {
         DWORD dwBytesSent;
-        DWORD flag = MSG_PARTIAL;
+        DWORD dwFlag = MSG_PARTIAL;
         int ret = WSASend(pConnClient->m_socket, &pSendIoCtx->m_wsaBuf, 1, &dwBytesSent,
-            flag, &pSendIoCtx->m_overlapped, NULL);
+            dwFlag, &pSendIoCtx->m_overlapped, NULL);
         if (SOCKET_ERROR == ret && WSA_IO_PENDING != WSAGetLastError())
         {
             cout << "WSASend failed with error: " << WSAGetLastError() << endl;
@@ -545,7 +560,7 @@ bool IocpServer::handleAccept(LPOVERLAPPED lpOverlapped, DWORD dwBytesTransferre
     ////开启心跳机制
     //setKeepAlive(pConnClient->m_socket, pIoCtx);
 
-    pConnClient->appendToBuffer(pBuf, dwBytesTransferred);
+    pConnClient->appendToBuffer((PBYTE)pBuf, dwBytesTransferred);
 
     //投递一个新的accpet请求
     postAccept(pAcceptIoCtx);
@@ -601,26 +616,34 @@ bool IocpServer::handleRecv(ULONG_PTR lpCompletionKey, LPOVERLAPPED lpOverlapped
 
 bool IocpServer::handleSend(ULONG_PTR lpCompletionKey, LPOVERLAPPED lpOverlapped, DWORD dwBytesTransferred)
 {
-    return true;
-}
+    ClientContext* pConnClient = (ClientContext*)lpCompletionKey;
+    IoContext* pIoCtx = (IoContext*)lpOverlapped;
 
-#if 0
-bool IocpServer::handleParse(ClientContext* pConnClient, IoContext* pIoCtx)
-{
-    //解析数据包，加锁
-    //DataPacket::parse(pConnClient);
+    DWORD n = -1;
 
-    //投递send请求
-    PostResult result = postSend(pConnClient);
-    if (PostResult::PostResultFailed == result)
+    pConnClient->m_outBuf.remove(dwBytesTransferred);
+    UINT nSendBufLen = pConnClient->m_outBuf.getBufferLen();
+    if (0 == nSendBufLen)
     {
-        CloseClient(pConnClient);
-        removeClientContext(pConnClient);
+        //SetEvent(m_hWriteCompletedEvent);
+        notifyWriteCompleted();
+        pConnClient->m_outBuf.clear();
+        return true;
     }
+    else
+    {
+        pIoCtx->m_wsaBuf.buf = (PCHAR)pConnClient->m_outBuf.getBuffer();
+        pIoCtx->m_wsaBuf.len = nSendBufLen;
 
-    return true;
+        PostResult result = postSend(pConnClient);
+        if (PostResult::PostResultFailed == result)
+        {
+            CloseClient(pConnClient);
+            removeClientContext(pConnClient);
+        }
+    }
+    return false;
 }
-#endif
 
 bool IocpServer::handleClose(ULONG_PTR lpCompletionKey)
 {
@@ -684,6 +707,11 @@ void IocpServer::CloseClient(ClientContext* pConnClient)
 bool IocpServer::decodePacket()
 {
 
+    return false;
+}
+
+bool IocpServer::encodePacket()
+{
     return false;
 }
 
