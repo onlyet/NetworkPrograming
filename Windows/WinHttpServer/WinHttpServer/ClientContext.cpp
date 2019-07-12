@@ -24,6 +24,7 @@ ClientContext::ClientContext(const SOCKET& socket) :
     , m_sendIoCtx(new IoContext(PostType::SEND_EVENT))
 {
     SecureZeroMemory(&m_addr, sizeof(SOCKADDR_IN));
+    InitializeCriticalSection(&m_csLock);
 }
 
 ClientContext::~ClientContext()
@@ -33,6 +34,7 @@ ClientContext::~ClientContext()
         closesocket(m_socket);
         m_socket = INVALID_SOCKET;
     }
+    LeaveCriticalSection(&m_csLock);
     //std::for_each(m_ioCtxs.begin(), m_ioCtxs.end(),
     //    [](const std::pair<PostType, IoContext*>& pr) { delete pr.second; });
     //m_ioCtxs.erase(m_ioCtxs.begin(), m_ioCtxs.end());
@@ -77,12 +79,15 @@ void ClientContext::appendToBuffer(const std::string& inBuf)
 
 bool ClientContext::decodePacket()
 {
-    //Slice header;
-    //HttpCodec::HttpState state;
+    Slice header;
+    HttpCodec::HttpState state;
 
-    //state = m_pCodec->getHeader(m_inBuf, header);
-    //
-    //state = m_pCodec->decodeHeader(header);
+    state = m_pCodec->getHeader(m_inBuf, header);
+    
+    Slice line;
+
+    Slice startLine;
+    state = m_pCodec->decodeHeader(header, startLine);
 
 
     return false;

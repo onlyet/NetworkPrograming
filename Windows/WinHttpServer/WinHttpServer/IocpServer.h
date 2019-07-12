@@ -57,9 +57,6 @@ protected:
     void removeAllClientContext();
     void CloseClient(ClientContext* pConnClient);
 
-    bool decodePacket();
-    bool encodePacket();
-
     void echo(ClientContext* pConnClient);
 
     //»Øµ÷º¯Êý

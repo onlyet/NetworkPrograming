@@ -15,6 +15,11 @@ Buffer::~Buffer()
         VirtualFree(m_pBegin, 0, MEM_RELEASE);
 }
 
+Buffer::operator Slice()
+{
+    return Slice((PCHAR)m_pBegin, getBufferLen());
+}
+
 void Buffer::clear()
 {
     m_pEnd = m_pBegin;

@@ -29,6 +29,7 @@ struct ClientContext
     void appendToBuffer(const std::string& inBuf);
 
     bool decodePacket();
+    bool encodePacket();
 
     SOCKET                              m_socket;       //客户端socket
     SOCKADDR_IN                         m_addr;         //客户端地址
@@ -36,8 +37,8 @@ struct ClientContext
     IoContext*                          m_sendIoCtx;
     HttpCodec*                          m_pCodec;
     Buffer                              m_inBuf;
-    //Buffer                              m_outBuf;
-    std::queue<Buffer>                  m_outBufList;
+    Buffer                              m_outBuf;
+    std::queue<Buffer>                  m_outBufQueue;
     CRITICAL_SECTION                    m_csLock;       //加锁，保护socket，链表
 };
 

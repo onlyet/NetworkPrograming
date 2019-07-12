@@ -3,6 +3,8 @@
 
 #include "Slice.h"
 //#include "Buffer.h"
+#include <string>
+#include <map>
 
 struct CodecBase 
 {
@@ -41,12 +43,22 @@ struct HttpCodec : public CodecBase
 
     };
 
+    HttpState getLine(Slice data, Slice& line);
+    HttpState decodeStartLine(Slice& line);
     HttpState getHeader(Slice data, Slice& header);
-    HttpState decodeHeader(Slice header);
-    bool decodeLine();
+    HttpState decodeHeader(Slice header, Slice& line);
+    HttpState getBody();
+    HttpState decodeBody();
+
+    HttpState handleGet();
+    HttpState handlePost();
+    HttpState handleUrl();
+
+
 
 private:
-    HttpState           m_state;
+    HttpState                               m_state;
+    std::map<std::string, std::string>      m_http;
 };
 
 #endif // !__CODEC_H__

@@ -15,6 +15,8 @@ public:
     Slice(const std::string& s) : pb_(s.data()), pe_(s.data() + s.size()) { }
     Slice(const char* s) : pb_(s), pe_(s + strlen(s)) { }
 
+    //operator std::string() { return std::string(pb_, pe_); }
+
     const char* data() const { return pb_; }
     const char* begin() const { return pb_; }
     const char* end() const { return pe_; }
@@ -55,9 +57,11 @@ private:
 
 inline Slice Slice::eatWord() {
     const char* b = pb_;
+    //跳到第一个非空白字符
     while (b < pe_ && isspace(*b)) {
         b++;
     }
+    //循环知道非空白字符结束
     const char* e = b;
     while (e < pe_ && !isspace(*e)) {
         e++;

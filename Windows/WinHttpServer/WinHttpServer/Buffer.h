@@ -1,6 +1,7 @@
 #ifndef __BUFFER_H__
 #define __BUFFER_H__
 
+#include "Slice.h"
 #include <string>
 
 class Buffer
@@ -8,6 +9,8 @@ class Buffer
 public:
     Buffer();
     virtual ~Buffer();
+
+    operator Slice();
 
     void clear();
     //相当于consume，跟consume不同，remove每次都要更换内存
