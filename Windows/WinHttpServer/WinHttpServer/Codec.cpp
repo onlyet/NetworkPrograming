@@ -2,8 +2,9 @@
 #include "Codec.h"
 
 #include <iostream>
-#include <string>
+//#include <string>
 #include <sstream>
+#include <string.h>
 
 using namespace std;
 
@@ -35,7 +36,7 @@ using namespace std;
 
 HttpCodec::HttpState HttpCodec::getLine(Slice data, Slice& line)
 {
-    m_state = HTTP_HEADER_INCORRECT;
+    m_state = HTTP_BAD_REQUEST;
 
     if (data.size() < 2)
         return m_state;
@@ -53,7 +54,7 @@ HttpCodec::HttpState HttpCodec::getLine(Slice data, Slice& line)
 
 HttpCodec::HttpState HttpCodec::decodeStartLine(Slice& line)
 {
-    m_state = HTTP_HEADER_INCORRECT;
+    m_state = HTTP_BAD_REQUEST;
     try
     {
 
@@ -86,18 +87,13 @@ HttpCodec::HttpState HttpCodec::decodeStartLine(Slice& line)
             return m_state;
         }
 
-        if (Slice("GET") == method || Slice("get") == method)
+        if (Slice("GET") != method || Slice("POST") != method)
         {
-
-        }
-        else if (Slice("POST") == method || Slice("post") == method)
-        {
-
-        }
-        else
-        {
+            cout << "invalid http method" << endl;
             return m_state;
         }
+        strcasecmp
+
     }
     catch (std::exception& e)
     {
@@ -108,7 +104,7 @@ HttpCodec::HttpState HttpCodec::decodeStartLine(Slice& line)
 
 HttpCodec::HttpState HttpCodec::getHeader(Slice data, Slice& header)
 {
-    m_state = HTTP_HEADER_INCORRECT;
+    m_state = HTTP_BAD_REQUEST;
 
     if (data.size() < 4)
         return m_state;

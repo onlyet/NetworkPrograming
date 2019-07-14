@@ -38,8 +38,7 @@ struct HttpCodec : public CodecBase
     enum HttpState
     {
         HTTP_OK,
-        HTTP_HEADER_INCORRECT,
-        HeaderIncorrect,
+        HTTP_BAD_REQUEST,
 
     };
 

@@ -205,26 +205,32 @@ int main(int argc, char *argv[])
 		int checked_index = 0;
 		int start_line = 0;
 		CHECK_STATE checkstate = CHECK_STATE_REQUESTLINE;
-		while (1) {
+		while (1) 
+        {
 			data_read = recv(fd, buffer + read_index, BUFFER_SIZE - read_index, 0);
-			if (data_read == -1) {
+			if (data_read == -1) 
+            {
 				printf("reading failed\n");
 				break;
 			}
-			else if (data_read == 0) {
+			else if (data_read == 0) 
+            {
 				printf("remote client has closed the connection\n");
 				break;
 			}
 			read_index += data_read;
 			HTTP_CODE result = parse_content(buffer, checked_index, checkstate, read_index, start_line);
-			if (result == NO_REQUEST) {
+			if (result == NO_REQUEST) 
+            {
 				continue;
 			}
-			else if (result == GET_REQUEST) {
+			else if (result == GET_REQUEST) 
+            {
 				send(fd, szret[0], strlen(szret[0]), 0);
 				break;
 			}
-			else {
+			else 
+            {
 				send(fd, szret[1], strlen(szret[1]), 0);
 				break;
 			}
