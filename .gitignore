@@ -215,3 +215,5 @@ ModelManifest.xml
 #VS File
 *.VC.db
 *.opendb
+
+build/
