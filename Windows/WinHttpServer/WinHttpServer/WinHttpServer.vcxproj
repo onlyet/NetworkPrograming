@@ -157,6 +157,8 @@
     <ClInclude Include="ClientContext.h" />
     <ClInclude Include="Codec.h" />
     <ClInclude Include="Global.h" />
+    <ClInclude Include="HttpCodec.h" />
+    <ClInclude Include="HttpServer.h" />
     <ClInclude Include="IoContext.h" />
     <ClInclude Include="IocpServer.h" />
     <ClInclude Include="LockGuard.h" />
@@ -170,6 +172,7 @@
     <ClCompile Include="Buffer_old.cpp" />
     <ClCompile Include="ClientContext.cpp" />
     <ClCompile Include="Codec.cpp" />
+    <ClCompile Include="HttpCodec.cpp" />
     <ClCompile Include="IoContext.cpp" />
     <ClCompile Include="IocpServer.cpp" />
     <ClCompile Include="Net.cpp" />
