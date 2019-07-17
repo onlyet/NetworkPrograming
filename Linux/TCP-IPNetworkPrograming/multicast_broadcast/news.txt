@@ -1,0 +1,4 @@
+构造线程池对象（vector里存n个空线程）
+初始化线程池，创建工作线程（消费者），工作线程从任务队列取任务执行（deuque）
+将任务（函数名和参数）包装成std::function,再将function包装成packaged_task，用以异步执行任务
+将packaged_task的指针包装成std::function<void()>,然后放进任务队列（enqueue），同时通过notify_one通知工作线程可以取任务
