@@ -115,7 +115,7 @@ bool IocpServer::stop()
         delete m_pListenCtx;
         m_pListenCtx = nullptr;
     }
-    removeAllClientContext();
+    removeAllClients();
 
     return true;
 }
@@ -164,6 +164,9 @@ bool IocpServer::send(ClientContext* pConnClient, PBYTE pData, UINT len)
 
     if (0 == pConnClient->m_outBuf.getBufferLen())
     {
+        //第一次投递，++m_nPendingIoCnt
+        enterIoLoop(pConnClient);
+
         pConnClient->m_outBuf.copy(sendBuf);
         pConnClient->m_sendIoCtx->m_wsaBuf.buf = (PCHAR)pConnClient->m_outBuf.getBuffer();
         pConnClient->m_sendIoCtx->m_wsaBuf.len = pConnClient->m_outBuf.getBufferLen();
@@ -172,7 +175,7 @@ bool IocpServer::send(ClientContext* pConnClient, PBYTE pData, UINT len)
         if (PostResult::PostResultFailed == result)
         {
             CloseClient(pConnClient);
-            removeClientContext(pConnClient);
+            releaseClientContext(pConnClient);
             return false;
         }
     }
@@ -482,6 +485,10 @@ PostResult IocpServer::postRecv(ClientContext* pConnClient)
             result = PostResult::PostResultFailed;
         }
     }
+    else
+    {
+        result = PostResult::PostResultInvalidSocket;
+    }
     return result;
 }
 
@@ -502,6 +509,10 @@ PostResult IocpServer::postSend(ClientContext* pConnClient)
             cout << "WSASend failed with error: " << WSAGetLastError() << endl;
             result = PostResult::PostResultFailed;
         }
+    }
+    else
+    {
+        result = PostResult::PostResultInvalidSocket;
     }
     return result;
 }
@@ -526,7 +537,7 @@ bool IocpServer::handleAccept(LPOVERLAPPED lpOverlapped, DWORD dwBytesTransferre
     Net::updateAcceptContext(m_pListenCtx->m_socket, pAcceptIoCtx->m_acceptSocket);
 
     //达到最大连接数则关闭新的socket
-    if (m_nConnClientCnt == m_nMaxConnClientCnt)
+    if (m_nConnClientCnt >= m_nMaxConnClientCnt)
     {
         closesocket(pAcceptIoCtx->m_acceptSocket);
         pAcceptIoCtx->m_acceptSocket = INVALID_SOCKET;
@@ -565,6 +576,8 @@ bool IocpServer::handleAccept(LPOVERLAPPED lpOverlapped, DWORD dwBytesTransferre
         return false;
     }
 
+    enterIoLoop(pConnClient);
+
     notifyNewConnection(pConnClient);
     notifyPackageReceived();
 
@@ -577,19 +590,19 @@ bool IocpServer::handleAccept(LPOVERLAPPED lpOverlapped, DWORD dwBytesTransferre
     postAccept(pAcceptIoCtx);
 
     //将客户端加入连接列表
-    addClientContext(pConnClient);
+    addClient(pConnClient);
 
     //解数据包
-    pConnClient->decodePacket();
+    //pConnClient->decodePacket();
 
     echo(pConnClient);
 
-    //投递recv请求
+    //投递recv请求,这里invalid socket是否要关闭客户端？
     PostResult result = postRecv(pConnClient);
-    if (PostResult::PostResultFailed == result)
+    if (PostResult::PostResultFailed == result || PostResult::PostResultInvalidSocket == result)
     {
         CloseClient(pConnClient);
-        removeClientContext(pConnClient);
+        releaseClientContext(pConnClient);
     }
 
     return true;
@@ -606,7 +619,7 @@ bool IocpServer::handleRecv(ULONG_PTR lpCompletionKey, LPOVERLAPPED lpOverlapped
     notifyPackageReceived();
 
     //解数据包
-    pConnClient->decodePacket();
+    //pConnClient->decodePacket();
 
     ////投递send请求
     //IoContext* pSendIoCtx = pConnClient->getIoContext(PostType::SEND_EVENT);
@@ -616,10 +629,10 @@ bool IocpServer::handleRecv(ULONG_PTR lpCompletionKey, LPOVERLAPPED lpOverlapped
 
     //投递recv请求
     PostResult result = postRecv(pConnClient);
-    if (PostResult::PostResultFailed == result)
+    if (PostResult::PostResultFailed == result || PostResult::PostResultInvalidSocket == result)
     {
         CloseClient(pConnClient);
-        removeClientContext(pConnClient);
+        releaseClientContext(pConnClient);
     }
 
     return true;
@@ -645,6 +658,10 @@ bool IocpServer::handleSend(ULONG_PTR lpCompletionKey, LPOVERLAPPED lpOverlapped
             pConnClient->m_outBuf.copy(pConnClient->m_outBufQueue.front());
             pConnClient->m_outBufQueue.pop();
         }
+        else
+        {
+            releaseClientContext(pConnClient);
+        }
     }
     if (0 != pConnClient->m_outBuf.getBufferLen())
     {
@@ -655,7 +672,7 @@ bool IocpServer::handleSend(ULONG_PTR lpCompletionKey, LPOVERLAPPED lpOverlapped
         if (PostResult::PostResultFailed == result)
         {
             CloseClient(pConnClient);
-            removeClientContext(pConnClient);
+            releaseClientContext(pConnClient);
         }
     }
     return false;
@@ -665,29 +682,18 @@ bool IocpServer::handleClose(ULONG_PTR lpCompletionKey)
 {
     ClientContext* pConnClient = (ClientContext*)lpCompletionKey;
     CloseClient(pConnClient);
-    removeClientContext(pConnClient);
+    releaseClientContext(pConnClient);
     return true;
 }
 
-void IocpServer::addClientContext(ClientContext* pConnClient)
+void IocpServer::enterIoLoop(ClientContext* pClientCtx)
 {
-    LockGuard lk(&m_csConnList);
-    m_connList.emplace_back(pConnClient);
+    InterlockedIncrement(&pClientCtx->m_nPendingIoCnt);
 }
 
-void IocpServer::removeClientContext(ClientContext* pConnClient)
+int IocpServer::exitIoLoop(ClientContext* pClientCtx)
 {
-    LockGuard lk(&m_csConnList);
-    m_connList.remove(pConnClient);
-    delete pConnClient;
-}
-
-void IocpServer::removeAllClientContext()
-{
-    LockGuard lk(&m_csConnList);
-    for_each(m_connList.begin(), m_connList.end(),
-        [](ClientContext* it) { delete it; });
-    m_connList.erase(m_connList.begin(), m_connList.end());
+    return InterlockedDecrement(&pClientCtx->m_nPendingIoCnt);
 }
 
 void IocpServer::CloseClient(ClientContext* pConnClient)
@@ -708,7 +714,8 @@ void IocpServer::CloseClient(ClientContext* pConnClient)
             return;
 
         int ret = CancelIoEx((HANDLE)s, NULL);
-        if (0 == ret)
+        //ERROR_NOT_FOUND : cannot find a request to cancel
+        if (0 == ret && ERROR_NOT_FOUND != WSAGetLastError())
         {
             cout << "CancelIoEx failed with error: " << WSAGetLastError() << endl;
             return;
@@ -720,19 +727,51 @@ void IocpServer::CloseClient(ClientContext* pConnClient)
     }
 }
 
+void IocpServer::addClient(ClientContext* pConnClient)
+{
+    LockGuard lk(&m_csConnList);
+    m_connList.emplace_back(pConnClient);
+}
+
+void IocpServer::removeClient(ClientContext* pConnClient)
+{
+    LockGuard lk(&m_csConnList);
+    m_connList.remove(pConnClient);
+}
+
+void IocpServer::removeAllClients()
+{
+    LockGuard lk(&m_csConnList);
+    //for_each(m_connList.begin(), m_connList.end(),
+    //    [](ClientContext* it) { delete it; });
+    m_connList.erase(m_connList.begin(), m_connList.end());
+}
+
+void IocpServer::releaseClientContext(ClientContext* pConnClient)
+{
+    if (exitIoLoop(pConnClient) <= 0)
+    {
+        removeClient(pConnClient);
+        delete pConnClient;
+    }
+}
+
 void IocpServer::echo(ClientContext* pConnClient)
 {
-    IoContext* pSendIoCtx = pConnClient->m_sendIoCtx;
-    RecvIoContext* pRecvIoCtx = pConnClient->m_recvIoCtx;
-    assert(nullptr != pRecvIoCtx);
+    //IoContext* pSendIoCtx = pConnClient->m_sendIoCtx;
+    //RecvIoContext* pRecvIoCtx = pConnClient->m_recvIoCtx;
+    //assert(nullptr != pRecvIoCtx);
 
-    pConnClient->m_outBuf.copy(pConnClient->m_inBuf);
-    pSendIoCtx->m_wsaBuf.buf = (PCHAR)pConnClient->m_outBuf.getBuffer(0);
-    pSendIoCtx->m_wsaBuf.len = pConnClient->m_outBuf.getBufferLen();
+    //pConnClient->m_outBuf.copy(pConnClient->m_inBuf);
+    //pSendIoCtx->m_wsaBuf.buf = (PCHAR)pConnClient->m_outBuf.getBuffer(0);
+    //pSendIoCtx->m_wsaBuf.len = pConnClient->m_outBuf.getBufferLen();
 
-    pConnClient->m_inBuf.remove(pConnClient->m_inBuf.getBufferLen());
+    //pConnClient->m_inBuf.remove(pConnClient->m_inBuf.getBufferLen());
 
-    postSend(pConnClient);
+    //postSend(pConnClient);
+
+
+    send(pConnClient, pConnClient->m_inBuf.getBuffer(), pConnClient->m_inBuf.getBufferLen());
 }
 
 void IocpServer::notifyNewConnection(ClientContext * pConnClient)

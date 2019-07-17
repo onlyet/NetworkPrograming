@@ -51,11 +51,19 @@ protected:
     bool handleSend(ULONG_PTR lpCompletionKey, LPOVERLAPPED lpOverlapped, DWORD dwBytesTransferred);
     bool handleClose(ULONG_PTR lpCompletionKey);
 
-    //线程安全
-    void addClientContext(ClientContext* pConnClient);
-    void removeClientContext(ClientContext* pConnClient);
-    void removeAllClientContext();
+
+    // Used to avoid access violation.
+    void enterIoLoop(ClientContext* pClientCtx);
+    int exitIoLoop(ClientContext* pClientCtx);
+
     void CloseClient(ClientContext* pConnClient);
+
+    //管理已连接客户端链表，线程安全
+    void addClient(ClientContext* pConnClient);
+    void removeClient(ClientContext* pConnClient);
+    void removeAllClients();
+
+    void releaseClientContext(ClientContext* pConnClient);
 
     void echo(ClientContext* pConnClient);
 

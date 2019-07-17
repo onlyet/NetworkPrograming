@@ -23,6 +23,7 @@ struct RecvIoContext;
 struct ClientContext
 {
     ClientContext(const SOCKET& socket = INVALID_SOCKET);
+    //socket由IocpServer释放
     ~ClientContext();
 
     void appendToBuffer(PBYTE pInBuf, size_t len);
@@ -31,15 +32,16 @@ struct ClientContext
     bool decodePacket();
     bool encodePacket();
 
-    SOCKET                              m_socket;       //客户端socket
-    SOCKADDR_IN                         m_addr;         //客户端地址
+    SOCKET                              m_socket;           //客户端socket
+    SOCKADDR_IN                         m_addr;             //客户端地址
+    ULONG                               m_nPendingIoCnt;    //Avoids Access Violation，该值为0时才能释放ClientContext
     RecvIoContext*                      m_recvIoCtx;
     IoContext*                          m_sendIoCtx;
     HttpCodec*                          m_pCodec;
     Buffer                              m_inBuf;
     Buffer                              m_outBuf;
     std::queue<Buffer>                  m_outBufQueue;
-    CRITICAL_SECTION                    m_csLock;       //加锁，保护socket，链表
+    CRITICAL_SECTION                    m_csLock;           //加锁，保护socket，链表
 };
 
 #endif // !__CLIENT_CONTEXT_H__

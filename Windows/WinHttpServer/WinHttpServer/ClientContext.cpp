@@ -22,6 +22,7 @@ ClientContext::ClientContext(const SOCKET& socket) :
     m_socket(socket)
     , m_recvIoCtx(new RecvIoContext())
     , m_sendIoCtx(new IoContext(PostType::SEND_EVENT))
+    , m_nPendingIoCnt(0)
 {
     SecureZeroMemory(&m_addr, sizeof(SOCKADDR_IN));
     InitializeCriticalSection(&m_csLock);
@@ -29,43 +30,12 @@ ClientContext::ClientContext(const SOCKET& socket) :
 
 ClientContext::~ClientContext()
 {
-    if (INVALID_SOCKET != m_socket)
-    {
-        closesocket(m_socket);
-        m_socket = INVALID_SOCKET;
-    }
+    delete m_recvIoCtx;
+    delete m_sendIoCtx;
+    m_recvIoCtx = nullptr;
+    m_sendIoCtx = nullptr;
     LeaveCriticalSection(&m_csLock);
-    //std::for_each(m_ioCtxs.begin(), m_ioCtxs.end(),
-    //    [](const std::pair<PostType, IoContext*>& pr) { delete pr.second; });
-    //m_ioCtxs.erase(m_ioCtxs.begin(), m_ioCtxs.end());
 }
-
-//IoContext* ClientContext::getIoContext(PostType type)
-//{
-//    std::map<PostType, IoContext*>::iterator it = m_ioCtxs.find(type);
-//    if (it != m_ioCtxs.end())
-//    {
-//        return m_ioCtxs[type];
-//    }
-//
-//    SOCKET ioSocket;
-//    if (ACCEPT_EVENT == type)
-//    {
-//        ioSocket = INVALID_SOCKET;
-//    }
-//    else
-//    {
-//        ioSocket = m_socket;
-//    }
-//    IoContext* ioCtx = new IoContext(type, ioSocket);
-//    m_ioCtxs.insert(std::make_pair(type, ioCtx));
-//    return ioCtx;
-//}
-//
-//void ClientContext::removeIoContext(IoContext* pIoCtx)
-//{
-//    m_ioCtxs.erase(pIoCtx->m_postType);
-//}
 
 void ClientContext::appendToBuffer(PBYTE pInBuf, size_t len)
 {

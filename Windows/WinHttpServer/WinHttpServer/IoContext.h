@@ -4,6 +4,8 @@
 #include "Global.h"
 #include "Buffer.h"
 
+//为了保证以下结构体第一个变量成员是OVERLAPPED，不能使用虚函数（具有虚函数的类第一个变量是虚表指针）
+
 struct IoContext
 {
     IoContext(PostType type);

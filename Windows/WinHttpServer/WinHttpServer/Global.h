@@ -21,7 +21,7 @@ enum PostResult
 {
     PostResultSuccesful,
     PostResultFailed,
-    PostResultInvalid,
+    PostResultInvalidSocket,
 };
 
 #endif // !__GLOBAL_H__

@@ -92,7 +92,7 @@ HttpCodec::HttpState HttpCodec::decodeStartLine(Slice& line)
             cout << "invalid http method" << endl;
             return m_state;
         }
-        strcasecmp
+        //strcasecmp
 
     }
     catch (std::exception& e)
