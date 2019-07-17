@@ -63,6 +63,7 @@ protected:
     void removeClient(ClientContext* pConnClient);
     void removeAllClients();
 
+    ClientContext* allocateClientContext(SOCKET s);
     void releaseClientContext(ClientContext* pConnClient);
 
     void echo(ClientContext* pConnClient);
@@ -90,8 +91,11 @@ private:
     DWORD                           m_nMaxConnClientCnt;    //最大客户端数量
 
     ListenContext*                  m_pListenCtx;           //监听上下文
-    std::list<ClientContext*>       m_connList;             //已连接客户端列表
-    CRITICAL_SECTION                m_csConnList;           //保护连接列表
+
+    std::list<ClientContext*>       m_connectedClientList;  //已连接客户端链表
+    std::list<ClientContext*>       m_freeClientList;       //空闲的ClientContext链表
+    CRITICAL_SECTION                m_csClientList;         //保护客户端链表std::list<ClientContext*>
+
 
     std::vector<HANDLE>             m_hWorkerThreads;       //工作线程句柄列表
     std::vector<AcceptIoContext*>   m_acceptIoCtxList;      //接收连接的IO上下文列表

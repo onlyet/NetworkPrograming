@@ -43,14 +43,14 @@ IocpServer::IocpServer(short listenPort, int maxConnectionCount) :
         cout << "CreateEvent failed with error: " << WSAGetLastError() << endl;
     }
 
-    InitializeCriticalSection(&m_csConnList);
+    InitializeCriticalSection(&m_csClientList);
 }
 
 IocpServer::~IocpServer()
 {
     stop();
 
-    DeleteCriticalSection(&m_csConnList);
+    DeleteCriticalSection(&m_csClientList);
     Net::unInit();
 }
 
@@ -150,7 +150,6 @@ bool IocpServer::shutdown()
         delete pAcceptIoCtx;
     });
     m_acceptIoCtxList.clear();
-
 
     return false;
 }
@@ -568,7 +567,8 @@ bool IocpServer::handleAccept(LPOVERLAPPED lpOverlapped, DWORD dwBytesTransferre
         << "peer address: " << peerAddrBuf << ":" << ntohs(peerAddr->sin_port) << endl;
 
     //创建新的ClientContext来保存新的连接socket，原来的IoContext要用来接收新的连接
-    ClientContext* pConnClient = new ClientContext(pAcceptIoCtx->m_acceptSocket);
+    //ClientContext* pConnClient = new ClientContext(pAcceptIoCtx->m_acceptSocket);
+    ClientContext* pConnClient = allocateClientContext(pAcceptIoCtx->m_acceptSocket);
     memcpy_s(&pConnClient->m_addr, peerAddrLen, peerAddr, peerAddrLen);
 
     if (NULL == associateWithCompletionPort(pConnClient->m_socket, (ULONG_PTR)pConnClient))
@@ -729,22 +729,45 @@ void IocpServer::CloseClient(ClientContext* pConnClient)
 
 void IocpServer::addClient(ClientContext* pConnClient)
 {
-    LockGuard lk(&m_csConnList);
-    m_connList.emplace_back(pConnClient);
+    LockGuard lk(&m_csClientList);
+    m_connectedClientList.emplace_back(pConnClient);
 }
 
 void IocpServer::removeClient(ClientContext* pConnClient)
 {
-    LockGuard lk(&m_csConnList);
-    m_connList.remove(pConnClient);
+    LockGuard lk(&m_csClientList);
+    auto it = std::find(m_connectedClientList.begin(), m_connectedClientList.end(), pConnClient);
+    if (m_connectedClientList.end() != it)
+    {
+        m_connectedClientList.remove(pConnClient);
+        m_freeClientList.emplace_back(pConnClient);
+    }
 }
 
 void IocpServer::removeAllClients()
 {
-    LockGuard lk(&m_csConnList);
-    //for_each(m_connList.begin(), m_connList.end(),
-    //    [](ClientContext* it) { delete it; });
-    m_connList.erase(m_connList.begin(), m_connList.end());
+    LockGuard lk(&m_csClientList);
+    m_connectedClientList.erase(m_connectedClientList.begin(), m_connectedClientList.end());
+}
+
+ClientContext* IocpServer::allocateClientContext(SOCKET s)
+{
+    ClientContext* pClientCtx = nullptr;
+
+    LockGuard lk(&m_csClientList);
+    if (m_freeClientList.empty())
+    {
+        pClientCtx = new ClientContext(s);
+    }
+    else
+    {
+        pClientCtx = m_freeClientList.front();
+        m_freeClientList.pop_front();
+    }
+
+    pClientCtx->reset();
+
+    return pClientCtx;
 }
 
 void IocpServer::releaseClientContext(ClientContext* pConnClient)

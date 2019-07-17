@@ -5,6 +5,8 @@
 #include <assert.h>
 #include "Codec.h"
 #include "Buffer.h"
+#include "LockGuard.h"
+
 
 ListenContext::ListenContext(short port, const std::string& ip)
 {
@@ -35,6 +37,14 @@ ClientContext::~ClientContext()
     m_recvIoCtx = nullptr;
     m_sendIoCtx = nullptr;
     LeaveCriticalSection(&m_csLock);
+}
+
+void ClientContext::reset()
+{
+    assert(INVALID_SOCKET != m_socket);
+    assert(0 == m_nPendingIoCnt);
+    assert(m_outBufQueue.empty());
+    SecureZeroMemory(&m_addr, sizeof(SOCKADDR_IN));
 }
 
 void ClientContext::appendToBuffer(PBYTE pInBuf, size_t len)

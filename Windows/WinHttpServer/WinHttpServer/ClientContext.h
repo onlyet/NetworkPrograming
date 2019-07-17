@@ -26,6 +26,8 @@ struct ClientContext
     //socket”…IocpServer Õ∑≈
     ~ClientContext();
 
+    void reset();
+
     void appendToBuffer(PBYTE pInBuf, size_t len);
     void appendToBuffer(const std::string& inBuf);
 
