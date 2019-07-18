@@ -2,15 +2,20 @@
 #define __HTTP_CODEC_H__
 
 #include <string>
+#include <map>
 
 class HttpCodec
 {
+public:
+
     enum HttpState
     {
         HTTP_OK,
         HTTP_BAD_REQUEST,
 
     };
+
+    void tryDecode(std::string msg);
 
     HttpState getLine(std::string data, std::string& line);
     HttpState decodeStartLine(std::string& line);
@@ -27,7 +32,7 @@ class HttpCodec
 
 private:
     HttpState                               m_state;
-    std::map<std::std::string, std::std::string>      m_http;
+    std::map<std::string, std::string>      m_http;
 };
 
 #endif // !__HTTP_CODEC_H__
