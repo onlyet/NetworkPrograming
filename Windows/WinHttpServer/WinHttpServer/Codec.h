@@ -4,7 +4,7 @@
 #include "Slice.h"
 //#include "Buffer.h"
 #include <string>
-#include <map>
+#include <unordered_map>
 
 struct CodecBase 
 {
@@ -39,13 +39,21 @@ struct HttpCodec : public CodecBase
     {
         HTTP_OK,
         HTTP_BAD_REQUEST,
+        Http_Header_Incomplete,
+        Http_Body_Incomplete,
 
+        Http_Invalid_Request_Line,  //400 (Bad Request) error or a 301 (Moved Permanently)
+        
     };
 
-    HttpState getLine(Slice data, Slice& line);
+    void tryDecode(Slice msg);
+
+    bool getHeader(Slice data, Slice& header);
+
+    bool getLine(Slice data, Slice& line);
+
     HttpState decodeStartLine(Slice& line);
-    HttpState getHeader(Slice data, Slice& header);
-    HttpState decodeHeader(Slice header, Slice& line);
+    HttpState parseHeader();
     HttpState getBody();
     HttpState decodeBody();
 
@@ -53,13 +61,18 @@ struct HttpCodec : public CodecBase
     HttpState handlePost();
     HttpState handleUrl();
 
+    bool informUnimplemented();
+    bool informUnsupported();
 
+    std::string getHeaderField(const std::string& strKey);
 
 private:
-    HttpState                               m_state;
-    std::map<std::string, std::string>      m_http;
+    HttpState                                       m_state;
+    std::unordered_map<std::string, std::string>    m_header;
+    size_t                                          m_nHeaderLength;    //HTTP消息头部长度，headerLen+bodyLen=wholeMsg
 };
 
+#include <map>
 void test()
 {
     string http;

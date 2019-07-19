@@ -32,7 +32,7 @@ public:
 
 private:
     HttpState                               m_state;
-    std::map<std::string, std::string>      m_http;
+    std::map<std::string, std::string>      m_header;
 };
 
 #endif // !__HTTP_CODEC_H__

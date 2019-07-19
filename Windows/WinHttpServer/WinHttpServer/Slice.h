@@ -33,16 +33,19 @@ public:
     //bool operator!=(const Slice& rhs);
 
     //return the eated data
+    //eat后，原来的Slice首元素指向空格或\r
     Slice eatWord();
+    //eat后，原来的Slice首元素指向\r
     Slice eatLine();
-    Slice eat(int sz);
+    Slice eat(size_t sz);
     Slice sub(int boff, int eoff = 0) const;
+    //跳过首尾空格
     Slice& trimSpace();
 
     char operator[](size_t n) const;
 
     std::string toString() const;
-    //operator std::string() const;
+    operator std::string() const;
 
     // Three-way comparison.  Returns value:
     int compare(const Slice& b) const;

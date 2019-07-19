@@ -82,11 +82,13 @@ void Slice::clear()
 Slice Slice::eatWord()
 {
     const char *b = m_pb;
+    //跳过空白字符
     while (b < m_pe && isspace(*b)) 
     {
         b++;
     }
     const char *e = b;
+    //直到空格或\r
     while (e < m_pe && !isspace(*e)) 
     {
         e++;
@@ -105,8 +107,11 @@ Slice Slice::eatLine()
     return Slice(p, m_pb - p);
 }
 
-Slice Slice::eat(int sz)
+Slice Slice::eat(size_t sz)
 {
+    if (sz > size())
+        sz = size();
+
     Slice s(m_pb, sz);
     m_pb += sz;
     return s;
@@ -141,10 +146,10 @@ std::string Slice::toString() const
     return std::string(m_pb, m_pe);
 }
 
-//Slice::operator std::string() const
-//{
-//    return std::string(m_pb, m_pe);
-//}
+Slice::operator std::string() const
+{
+    return std::string(m_pb, m_pe);
+}
 
 int Slice::compare(const Slice& b) const
 {
