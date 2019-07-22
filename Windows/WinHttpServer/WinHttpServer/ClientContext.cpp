@@ -56,19 +56,3 @@ void ClientContext::appendToBuffer(const std::string& inBuf)
 {
     m_inBuf.write(inBuf);
 }
-
-bool ClientContext::decodePacket()
-{
-    Slice header;
-    HttpCodec::HttpState state;
-
-    state = m_pCodec->getHeader(m_inBuf, header);
-    
-    Slice line;
-
-    Slice startLine;
-    state = m_pCodec->decodeHeader(header, startLine);
-
-
-    return false;
-}

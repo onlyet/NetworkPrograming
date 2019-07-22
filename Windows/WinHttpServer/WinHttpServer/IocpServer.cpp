@@ -805,7 +805,7 @@ void IocpServer::notifyDisconnected()
 {
 }
 
-void IocpServer::notifyPackageReceived()
+void IocpServer::notifyPackageReceived(ClientContext* pConnClient)
 {
 }
 

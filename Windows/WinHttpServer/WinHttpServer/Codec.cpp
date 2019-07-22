@@ -4,7 +4,7 @@
 #include <iostream>
 //#include <string>
 #include <sstream>
-#include <string.h>
+//#include <string>
 
 using namespace std;
 
@@ -34,31 +34,33 @@ using namespace std;
 //    return 0;
 //}
 
-void HttpCodec::tryDecode(Slice msg)
+HttpCodec::HttpCodec(PBYTE pData, UINT size)
+    : m_inBuf((PCHAR)pData, size)
 {
-    Slice data; // Slice data(m_inBuf.data(), m_inBuf.len());
+}
+
+int HttpCodec::tryDecode()
+{
     Slice header;
-    getHeader(data, header);
+    getHeader(m_inBuf, header);
     if (header.empty())
     {
-        m_state = Http_Header_Incomplete;
-        return;
+        return 0;
     }
 
     Slice startLine = header.eatLine();
-    //decodeStartLine(startLine);
     Slice method = startLine.eatWord();
     Slice url = startLine.eatWord();
     Slice version = startLine.eatWord();
     if (version.empty())
     {
-        m_state = Http_Header_Incomplete;
-        return;
+        m_res.m_status = bad_request;
+        return -1;
     }
 
-    m_header.insert(make_pair("method", method));
-    m_header.insert(make_pair("url", url));
-    m_header.insert(make_pair("version", version));
+    m_req.m_method = method;
+    m_req.m_url = url;
+    m_req.m_version = version;
 
     while (!header.empty())
     {
@@ -71,101 +73,67 @@ void HttpCodec::tryDecode(Slice msg)
         if(!key.empty() && !line.empty() && key.back() == ':')
         {
             //删除:
-            m_header.insert(make_pair(key.sub(0, -1), value));
+            m_req.m_headers.insert(make_pair(key.sub(0, -1), value));
         }
         else if (line.empty())
         {
             //只有start-line？
+            m_res.m_status = bad_request;
+            return -1;
         }
         else
         {
-            m_state = Http_Header_Incomplete;
-            return;
+            m_res.m_status = bad_request;
+            return -1;
         }
     }
 
-    //data.eat(m_nHeaderLength);
-    string contentLength = getHeaderField("content-length");
-    if (contentLength.empty())
+    if (!parseStartLine())
     {
-        m_state = Http_Header_Incomplete;
-        return;
+        return -1;
+    }
+    if (!parseHeader())
+    {
+        return -1;
     }
 
-    if (data.size() < m_nHeaderLength + atoi(contentLength.c_str()))
-    {
-        m_state = Http_Body_Incomplete;
-        return;
-    }
-    Slice body(data.data() + m_nHeaderLength, atoi(contentLength.c_str()));
+    string contentLength = m_req.getHeaderField("content-length");
 
+    //body不完整，继续recv
+    if (m_inBuf.size() < m_req.m_nHeaderLength + atoi(contentLength.c_str()))
+    {
+        return 0;
+    }
+
+    m_req.m_body = Slice(m_inBuf.data() + m_req.m_nHeaderLength, atoi(contentLength.c_str()));
+
+    if ("GET" == m_req.m_method)
+    {
+        writeResponse();
+        return m_inBuf.size();
+    }
+    else if ("POST" == m_req.m_method)
+    {
+        if (!parseBody())
+            return -1;
+    }
+    return -1;
 }
 
-bool HttpCodec::getLine(Slice data, Slice& line)
+std::string HttpCodec::responseMessage() const
 {
-    size_t sz = data.size();
-    if (sz < 2)
-        return false;
-
-    const char* pb = data.begin();
-    for (size_t i = 0; i <= sz - 2; ++i)
-    {
-        if ('\r' == data[i] && 0 == memcmp("\r\n", pb + i, 2))
-        {
-            line = Slice(pb, i);
-            return true;
-        }
-    }
-    return false;
+    return m_outBuf;
 }
 
-HttpCodec::HttpState HttpCodec::decodeStartLine(Slice& line)
+void HttpCodec::writeResponse()
 {
-    m_state = HTTP_BAD_REQUEST;
-    try
-    {
-        Slice method = line.eatWord();
-        if (method.empty())
-        {
-            cout << "invalid http method" << endl;
-            return m_state;
-        }
-        Slice url = line.eatWord();
-        if (url.empty())
-        {
-            cout << "invalid http url" << endl;
-            return m_state;
-        }
-        Slice version = line.eatWord();
-        if (version.empty())
-        {
-            cout << "invalid http version" << endl;
-            return m_state;
-        }
-        //m_header.insert(string("method"), string(method.begin(), method.end()));
-        m_header["method"] = method.toString();
-        m_header["url"] = url.toString();
-        m_header["version"] = version.toString();
-
-        if (Slice("HTTP/1.0") != version && Slice("HTTP/1.1") != version)
-        {
-            cout << "invalid http version" << endl;
-            return m_state;
-        }
-
-        if (Slice("GET") != method || Slice("POST") != method)
-        {
-            cout << "invalid http method" << endl;
-            return m_state;
-        }
-        //strcasecmp
-
-    }
-    catch (std::exception& e)
-    {
-        cout << "exception: " << e.what() << endl;
-    }
-    return m_state;
+    //m_outBuf.append("HTTP/1.1");
+    ostringstream os(m_outBuf);
+    os << "HTTP/1.1" << " " << m_res.m_status << "\r\n";
+    os << "Content-Type: text/plain\r\n";
+    os << "Content-Length: 5\r\n";
+    os << "\r\n";
+    os << "hello";
 }
 
 bool HttpCodec::getHeader(Slice data, Slice& header)
@@ -180,47 +148,92 @@ bool HttpCodec::getHeader(Slice data, Slice& header)
         if ('\r' == data[i] && memcmp("\r\n\r\n", pb + i, 4))
         {
             header = Slice(pb, i);
-            m_nHeaderLength = i + 4;
+            m_req.m_nHeaderLength = i + 4;
             return true;
         }
     }
     return false;
 }
 
-HttpCodec::HttpState HttpCodec::parseHeader()
+bool HttpCodec::parseStartLine()
 {
-    const string& method = m_header["method"];
-    if ("GET" != method || "POST" != method)
+    try
     {
-        informUnimplemented();
-        return m_state;
+        if ("HTTP/1.0" != m_req.m_version || "HTTP/1.1" != m_req.m_version)
+        {
+            informUnsupported();
+            return false;
+        }
+        if ("GET" != m_req.m_method || "POST" != m_req.m_method)
+        {
+            informUnimplemented();
+            return false;
+        }
+        if ("" == m_req.m_url)
+        {
+            m_res.m_status = bad_request;
+            return false;
+        }
+        if ('/' != m_req.m_url.at(0))
+        {
+            m_res.m_status = bad_request;
+            return false;
+        }
+
+        return true;
     }
-    const string& version = m_header["version"];
-    if ("HTTP/1.1" != version)
+    catch (std::exception& e)
     {
-        informUnsupported();
-        return m_state;
+        cout << "exception: " << e.what() << endl;
+        m_res.m_status = internal_server_error;
+        return false;
+    }
+}
+
+bool HttpCodec::parseHeader()
+{
+    if ("POST" == m_req.m_method)
+    {
+        auto it = m_req.m_headers.find("Content-Length");
+        if (it == m_req.m_headers.end())
+        {
+            m_res.m_status = bad_request;
+            return false;
+        }
+    }
+    auto it = m_req.m_headers.find("Host");
+    if (it == m_req.m_headers.end())
+    {
+        m_res.m_status = bad_request;
+        return false;
     }
 
+    return true;
+}
+
+bool HttpCodec::parseBody()
+{
 
 }
 
 bool HttpCodec::informUnimplemented()
 {
-    return false;
+    m_res.m_status = not_implemented;
+    return true;
 }
 
 bool HttpCodec::informUnsupported()
 {
     // 505 (HTTP Version Not Supported)
-    return false;
+    m_res.m_status = http_version_not_supported;
+    return true;
 }
 
-std::string HttpCodec::getHeaderField(const std::string& strKey)
-{
-    auto it = m_header.find(strKey);
-    return it != m_header.end() ? m_header[strKey] : "";
-}
+//std::string HttpCodec::getHeaderField(const std::string& strKey)
+//{
+//    auto it = m_header.find(strKey);
+//    return it != m_header.end() ? m_header[strKey] : "";
+//}
 
 
 

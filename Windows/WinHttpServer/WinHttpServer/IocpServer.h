@@ -17,7 +17,7 @@ public:
     IocpServer(short listenPort, int maxConnectionCount = 10000);
     IocpServer(const IocpServer&) = delete;
     IocpServer& operator=(const IocpServer&) = delete;
-    ~IocpServer();
+    virtual ~IocpServer();
 
     bool start();
     bool stop();
@@ -71,7 +71,7 @@ protected:
     //»Øµ÷º¯Êý
     virtual void notifyNewConnection(ClientContext* pConnClient);
     virtual void notifyDisconnected();
-    virtual void notifyPackageReceived();
+    virtual void notifyPackageReceived(ClientContext* pConnClient);
     virtual void notifyWritePackage();
     virtual void notifyWriteCompleted();
 

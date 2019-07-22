@@ -31,9 +31,6 @@ struct ClientContext
     void appendToBuffer(PBYTE pInBuf, size_t len);
     void appendToBuffer(const std::string& inBuf);
 
-    bool decodePacket();
-    bool encodePacket();
-
     SOCKET                              m_socket;           //客户端socket
     SOCKADDR_IN                         m_addr;             //客户端地址
     ULONG                               m_nPendingIoCnt;    //Avoids Access Violation，该值为0时才能释放ClientContext
