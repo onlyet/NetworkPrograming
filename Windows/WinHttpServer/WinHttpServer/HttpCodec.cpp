@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "HttpCodec.h"
 
 using namespace std;
@@ -8,7 +9,7 @@ void HttpCodec::tryDecode(std::string msg)
     if (sz < 4)
         return;
 
-    for (int i = 0; i < msg.size(); ++i)
+    for (size_t i = 0; i < msg.size(); ++i)
     {
         char c = msg.at(i);
         if ('\r' == c && memcmp("\r\n\r\n", msg.data() + i, 4))

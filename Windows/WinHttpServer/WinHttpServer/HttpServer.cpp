@@ -3,6 +3,7 @@
 #include "Slice.h"
 #include "ClientContext.h"
 #include "Codec.h"
+#include <iostream>
 
 using namespace std;
 
@@ -25,5 +26,19 @@ void HttpServer::notifyPackageReceived(ClientContext* pConnClient)
             send(pConnClient, (PBYTE)resMsg.c_str(), resMsg.length());
             pConnClient->m_inBuf.remove(pConnClient->m_inBuf.getBufferLen());
         }
+        if (ret < 0)
+        {
+            cout << "tryDecode failed" << endl;
+            CloseClient(pConnClient);
+            releaseClientContext(pConnClient);
+        }
     }
+}
+
+void HttpServer::notifyDisconnected(SOCKET s, SOCKADDR_IN addr)
+{
+    char peerAddrBuf[1024] = { 0 };
+    inet_ntop(AF_INET, &addr.sin_addr, peerAddrBuf, 1024);
+    cout << "closed client " << peerAddrBuf << ":" << ntohs(addr.sin_port)
+        << ", fd: "<< s << endl;
 }

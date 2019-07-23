@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "Slice.h"
 
 Slice::Slice()
@@ -85,22 +86,22 @@ Slice Slice::eatWord()
     //跳过空白字符
     while (b < m_pe && isspace(*b)) 
     {
-        b++;
+        ++b;
     }
     const char *e = b;
     //直到空格或\r
     while (e < m_pe && !isspace(*e)) 
     {
-        e++;
+        ++e;
     }
     m_pb = e;
-    return Slice(b, e - b);
+    return Slice(b, e);
 }
 
 Slice Slice::eatLine()
 {
     const char* p = m_pb;
-    while (m_pb < m_pe && *m_pb != '\n' && *m_pb != '\r') 
+    while (m_pb < m_pe && *m_pb != '\r' && *m_pb != '\n') 
     {
         m_pb++;
     }

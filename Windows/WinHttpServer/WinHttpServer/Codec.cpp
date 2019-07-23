@@ -70,16 +70,10 @@ int HttpCodec::tryDecode()
         Slice key = line.eatWord();
         Slice value = line.eatWord();
 
-        if(!key.empty() && !line.empty() && key.back() == ':')
+        if(!value.empty() && !key.empty() && key.back() == ':')
         {
             //É¾³ý:
             m_req.m_headers.insert(make_pair(key.sub(0, -1), value));
-        }
-        else if (line.empty())
-        {
-            //Ö»ÓÐstart-line£¿
-            m_res.m_status = bad_request;
-            return -1;
         }
         else
         {
@@ -128,12 +122,14 @@ std::string HttpCodec::responseMessage() const
 void HttpCodec::writeResponse()
 {
     //m_outBuf.append("HTTP/1.1");
-    ostringstream os(m_outBuf);
+    m_res.m_status = ok;
+    ostringstream os;
     os << "HTTP/1.1" << " " << m_res.m_status << "\r\n";
     os << "Content-Type: text/plain\r\n";
     os << "Content-Length: 5\r\n";
     os << "\r\n";
     os << "hello";
+    m_outBuf = os.str();
 }
 
 bool HttpCodec::getHeader(Slice data, Slice& header)
@@ -145,7 +141,7 @@ bool HttpCodec::getHeader(Slice data, Slice& header)
     for (size_t i = 0; i <= sz - 4; ++i)
     {
         const char* pb = data.data();
-        if ('\r' == data[i] && memcmp("\r\n\r\n", pb + i, 4))
+        if ('\r' == data[i] && 0 == memcmp("\r\n\r\n", pb + i, 4))
         {
             header = Slice(pb, i);
             m_req.m_nHeaderLength = i + 4;
@@ -159,12 +155,12 @@ bool HttpCodec::parseStartLine()
 {
     try
     {
-        if ("HTTP/1.0" != m_req.m_version || "HTTP/1.1" != m_req.m_version)
+        if ("HTTP/1.0" != m_req.m_version && "HTTP/1.1" != m_req.m_version)
         {
             informUnsupported();
             return false;
         }
-        if ("GET" != m_req.m_method || "POST" != m_req.m_method)
+        if ("GET" != m_req.m_method && "POST" != m_req.m_method)
         {
             informUnimplemented();
             return false;
@@ -213,7 +209,7 @@ bool HttpCodec::parseHeader()
 
 bool HttpCodec::parseBody()
 {
-
+    return true;
 }
 
 bool HttpCodec::informUnimplemented()
@@ -229,11 +225,6 @@ bool HttpCodec::informUnsupported()
     return true;
 }
 
-//std::string HttpCodec::getHeaderField(const std::string& strKey)
-//{
-//    auto it = m_header.find(strKey);
-//    return it != m_header.end() ? m_header[strKey] : "";
-//}
 
 
 

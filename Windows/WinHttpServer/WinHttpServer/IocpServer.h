@@ -70,7 +70,8 @@ protected:
 
     //»Øµ÷º¯Êý
     virtual void notifyNewConnection(ClientContext* pConnClient);
-    virtual void notifyDisconnected();
+    //virtual void notifyDisconnected(ClientContext* pConnClient);
+    virtual void notifyDisconnected(SOCKET s, SOCKADDR_IN addr);
     virtual void notifyPackageReceived(ClientContext* pConnClient);
     virtual void notifyWritePackage();
     virtual void notifyWriteCompleted();

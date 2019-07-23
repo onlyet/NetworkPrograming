@@ -563,8 +563,10 @@ bool IocpServer::handleAccept(LPOVERLAPPED lpOverlapped, DWORD dwBytesTransferre
     inet_ntop(AF_INET, &peerAddr->sin_addr, peerAddrBuf, 1024);
     //cout << "local address: " << inet_ntoa(localAddr->sin_addr) << ":" << ntohs(localAddr->sin_port) << "\t"
     //    << "peer address: " << inet_ntoa(peerAddr->sin_addr) << ":" << ntohs(peerAddr->sin_port) << endl;
-    cout << "local address: " << localAddrBuf << ":" << ntohs(localAddr->sin_port) << "\t"
+    cout << "local address: " << localAddrBuf << ":" << ntohs(localAddr->sin_port) << "-->"
         << "peer address: " << peerAddrBuf << ":" << ntohs(peerAddr->sin_port) << endl;
+
+    m_freeClientList.begin();
 
     //创建新的ClientContext来保存新的连接socket，原来的IoContext要用来接收新的连接
     //ClientContext* pConnClient = new ClientContext(pAcceptIoCtx->m_acceptSocket);
@@ -578,8 +580,7 @@ bool IocpServer::handleAccept(LPOVERLAPPED lpOverlapped, DWORD dwBytesTransferre
 
     enterIoLoop(pConnClient);
 
-    notifyNewConnection(pConnClient);
-    notifyPackageReceived();
+
 
     ////开启心跳机制
     //setKeepAlive(pConnClient->m_socket, pIoCtx);
@@ -589,13 +590,16 @@ bool IocpServer::handleAccept(LPOVERLAPPED lpOverlapped, DWORD dwBytesTransferre
     //投递一个新的accpet请求
     postAccept(pAcceptIoCtx);
 
+    notifyNewConnection(pConnClient);
+    notifyPackageReceived(pConnClient);
+
     //将客户端加入连接列表
     addClient(pConnClient);
 
     //解数据包
     //pConnClient->decodePacket();
 
-    echo(pConnClient);
+    //echo(pConnClient);
 
     //投递recv请求,这里invalid socket是否要关闭客户端？
     PostResult result = postRecv(pConnClient);
@@ -616,7 +620,7 @@ bool IocpServer::handleRecv(ULONG_PTR lpCompletionKey, LPOVERLAPPED lpOverlapped
     //加锁
     pConnClient->appendToBuffer(pRecvIoCtx->m_recvBuf, dwBytesTransferred);
 
-    notifyPackageReceived();
+    notifyPackageReceived(pConnClient);
 
     //解数据包
     //pConnClient->decodePacket();
@@ -625,7 +629,7 @@ bool IocpServer::handleRecv(ULONG_PTR lpCompletionKey, LPOVERLAPPED lpOverlapped
     //IoContext* pSendIoCtx = pConnClient->getIoContext(PostType::SEND_EVENT);
     //postSend(pSendIoCtx);
 
-    echo(pConnClient);
+    //echo(pConnClient);
 
     //投递recv请求
     PostResult result = postRecv(pConnClient);
@@ -699,16 +703,18 @@ int IocpServer::exitIoLoop(ClientContext* pClientCtx)
 void IocpServer::CloseClient(ClientContext* pConnClient)
 {
     SOCKET s;
+    SOCKADDR_IN peerAddr;
 
     {
         LockGuard lk(&pConnClient->m_csLock);
         s = pConnClient->m_socket;
+        peerAddr = pConnClient->m_addr;
         pConnClient->m_socket = INVALID_SOCKET;
     }
 
     if (INVALID_SOCKET != s)
     {
-        notifyDisconnected();
+        notifyDisconnected(s, peerAddr);
 
         if (!Net::setLinger(s))
             return;
@@ -736,11 +742,13 @@ void IocpServer::addClient(ClientContext* pConnClient)
 void IocpServer::removeClient(ClientContext* pConnClient)
 {
     LockGuard lk(&m_csClientList);
-    auto it = std::find(m_connectedClientList.begin(), m_connectedClientList.end(), pConnClient);
-    if (m_connectedClientList.end() != it)
     {
-        m_connectedClientList.remove(pConnClient);
-        m_freeClientList.emplace_back(pConnClient);
+        auto it = std::find(m_connectedClientList.begin(), m_connectedClientList.end(), pConnClient);
+        if (m_connectedClientList.end() != it)
+        {
+            m_connectedClientList.remove(pConnClient);
+            m_freeClientList.emplace_back(pConnClient);
+        }
     }
 }
 
@@ -763,6 +771,7 @@ ClientContext* IocpServer::allocateClientContext(SOCKET s)
     {
         pClientCtx = m_freeClientList.front();
         m_freeClientList.pop_front();
+        pClientCtx->m_socket = s;
     }
 
     pClientCtx->reset();
@@ -775,7 +784,10 @@ void IocpServer::releaseClientContext(ClientContext* pConnClient)
     if (exitIoLoop(pConnClient) <= 0)
     {
         removeClient(pConnClient);
-        delete pConnClient;
+
+        //这里不删除，而是将ClientContext移到空闲链表
+        //delete pConnClient;
+
     }
 }
 
@@ -801,7 +813,7 @@ void IocpServer::notifyNewConnection(ClientContext * pConnClient)
 {
 }
 
-void IocpServer::notifyDisconnected()
+void IocpServer::notifyDisconnected(SOCKET s, SOCKADDR_IN addr)
 {
 }
 

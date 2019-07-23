@@ -41,7 +41,6 @@ ClientContext::~ClientContext()
 
 void ClientContext::reset()
 {
-    assert(INVALID_SOCKET != m_socket);
     assert(0 == m_nPendingIoCnt);
     assert(m_outBufQueue.empty());
     SecureZeroMemory(&m_addr, sizeof(SOCKADDR_IN));

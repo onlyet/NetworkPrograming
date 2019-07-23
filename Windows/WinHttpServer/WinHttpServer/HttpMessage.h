@@ -2,7 +2,6 @@
 #define __HTTP_MESSAGE_H__
 
 #include "Slice.h"
-#include <string>
 #include <unordered_map>
 
 struct HttpMessage
@@ -21,7 +20,7 @@ struct HttpRequest : public HttpMessage
     enum RequestMethod
     {
         GET,
-        POST,
+        POST
     };
 
     size_t                                          m_nHeaderLength;
@@ -33,6 +32,6 @@ struct HttpRequest : public HttpMessage
 struct HttpResponse : public HttpMessage
 {
     int                                             m_status;
-}
+};
 
 #endif // !__HTTP_MESSAGE_H__

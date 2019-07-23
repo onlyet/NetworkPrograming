@@ -3,15 +3,17 @@
 
 #include "IocpServer.h"
 
-class HttpServer : IocpServer
+class HttpServer : public IocpServer
 {
 public:
     HttpServer(short listenPort, int maxConnectionCount = 10000);
-    HttpServer(const HttpServer&);
-    ~HttpServer();
+    ~HttpServer() {}
 
 protected:
     void notifyPackageReceived(ClientContext* pConnClient) override;
+    void notifyDisconnected(SOCKET s, SOCKADDR_IN addr) override;
+
+
 };
 
 #endif // !__HTTP_SERVER_H__
