@@ -60,6 +60,9 @@
     <ClInclude Include="HttpMessage.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Addr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -99,6 +102,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="HttpMessage.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Addr.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

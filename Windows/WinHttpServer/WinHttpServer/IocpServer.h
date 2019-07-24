@@ -4,6 +4,7 @@
 #include <list>
 #include <vector>
 #include "Global.h"
+#include "Addr.h"
 
 struct ListenContext;
 struct IoContext;
@@ -71,7 +72,7 @@ protected:
     //»Øµ÷º¯Êý
     virtual void notifyNewConnection(ClientContext* pConnClient);
     //virtual void notifyDisconnected(ClientContext* pConnClient);
-    virtual void notifyDisconnected(SOCKET s, SOCKADDR_IN addr);
+    virtual void notifyDisconnected(SOCKET s, Addr addr);
     virtual void notifyPackageReceived(ClientContext* pConnClient);
     virtual void notifyWritePackage();
     virtual void notifyWriteCompleted();

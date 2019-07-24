@@ -14,7 +14,9 @@ struct Net
     static int bind(SOCKET s, const LPSOCKADDR_IN pAddr);
     static int listen(SOCKET s, int backlog = SOMAXCONN);
 
-    //static int 
+    static SOCKADDR_IN getsockname(SOCKET s);
+    static SOCKADDR_IN getpeername(SOCKET s);
+
 
     static bool setKeepAlive(SOCKET s, bool on);
     //默认强制关闭（连接重置）

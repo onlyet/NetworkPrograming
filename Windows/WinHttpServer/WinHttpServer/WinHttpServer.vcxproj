@@ -152,6 +152,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Addr.h" />
     <ClInclude Include="Buffer.h" />
     <ClInclude Include="Buffer_old.h" />
     <ClInclude Include="ClientContext.h" />
@@ -169,6 +170,7 @@
     <ClInclude Include="Slice.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Addr.cpp" />
     <ClCompile Include="Buffer.cpp" />
     <ClCompile Include="Buffer_old.cpp" />
     <ClCompile Include="ClientContext.cpp" />

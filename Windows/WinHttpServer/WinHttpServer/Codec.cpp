@@ -127,6 +127,19 @@ void HttpCodec::writeResponse()
     os << "HTTP/1.1" << " " << m_res.m_status << "\r\n";
     os << "Content-Type: text/plain\r\n";
     os << "Content-Length: 5\r\n";
+
+
+
+    //非法连接则通知对端关闭http连接，然后server再关闭tcp连接
+    if (ok != m_res.m_status)
+    {
+        os << "Connection: close\r\n";
+    }
+    else
+    {
+        //os << "Connection: keep-alive\r\n";
+    }
+
     os << "\r\n";
     os << "hello";
     m_outBuf = os.str();
@@ -202,6 +215,12 @@ bool HttpCodec::parseHeader()
     {
         m_res.m_status = bad_request;
         return false;
+    }
+
+    auto it2 = m_req.m_headers.find("Connection");
+    if (it2 != m_req.m_headers.end())
+    {
+        cout << "keep-alive" << endl;
     }
 
     return true;

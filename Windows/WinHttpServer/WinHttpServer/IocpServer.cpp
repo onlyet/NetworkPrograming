@@ -11,6 +11,7 @@
 #include <process.h>
 #include <mstcpip.h>    //for struct tcp_keepalive
 
+#include <thread>
 
 using namespace std;
 
@@ -201,34 +202,39 @@ unsigned WINAPI IocpServer::IocpWorkerThread(LPVOID arg)
     {
         ret = GetQueuedCompletionStatus(pThis->m_hComPort, &dwBytesTransferred,
             &lpCompletionKey, &lpOverlapped, dwMilliSeconds);
+
         if (EXIT_THREAD == lpCompletionKey)
         {
             //退出工作线程
             cout << "EXIT_THREAD" << endl;
             break;
         }
-        //超时的时候触发，INFINITE不会触发
-        if (0 == ret)
-        {
-            cout << "GetQueuedCompletionStatus failed with error: " << WSAGetLastError() << endl;
-            pThis->handleClose(lpCompletionKey);
-            continue;
-        }
-
-        IoContext* pIoCtx = (IoContext*)lpOverlapped;
-
-        //对端关闭
-        if (0 == dwBytesTransferred && 5 != pIoCtx->m_postType)
-        {
-            pThis->handleClose(lpCompletionKey);
-            continue;
-        }
-
         //shutdown状态则停止接受连接
         if (pThis->m_bIsShutdown && lpCompletionKey == (ULONG_PTR)pThis)
         {
             continue;
         }
+
+        if (lpCompletionKey != (ULONG_PTR)pThis)
+        {
+            //文档说超时的时候触发，INFINITE不会触发
+            //实际上curl命令行ctrl+c强制关闭连接也会触发
+            if (0 == ret)
+            {
+                cout << "GetQueuedCompletionStatus failed with error: " << WSAGetLastError() << endl;
+                pThis->handleClose(lpCompletionKey);
+                continue;
+            }
+
+            //对端关闭
+            if (0 == dwBytesTransferred)
+            {
+                pThis->handleClose(lpCompletionKey);
+                continue;
+            }
+        }
+
+        IoContext* pIoCtx = (IoContext*)lpOverlapped;
 
         switch (pIoCtx->m_postType)
         {
@@ -430,11 +436,10 @@ bool IocpServer::postAccept(AcceptIoContext* pAcceptIoCtx)
     pAcceptIoCtx->resetBuffer();
 
     DWORD dwRecvByte;
-    PCHAR pBuf = pAcceptIoCtx->m_wsaBuf.buf;
-    ULONG nLen = pAcceptIoCtx->m_wsaBuf.len - ACCEPT_ADDRS_SIZE;
+    //PCHAR pBuf = pAcceptIoCtx->m_wsaBuf.buf;
+    //ULONG nLen = pAcceptIoCtx->m_wsaBuf.len - ACCEPT_ADDRS_SIZE;
 
     LPOVERLAPPED pOverlapped = &pAcceptIoCtx->m_overlapped;
-    //LPOVERLAPPED pOverlapped = (LPOVERLAPPED)pAcceptIoCtx;
     LPFN_ACCEPTEX lpfnAcceptEx = (LPFN_ACCEPTEX)m_lpfnAcceptEx;
 
     //创建用于接受连接的socket
@@ -445,8 +450,14 @@ bool IocpServer::postAccept(AcceptIoContext* pAcceptIoCtx)
         return false;
     }
 
+    /*
+    * 使用acceptEx的一个问题：
+    * 如果客户端连上却没发送数据，则acceptEx不会触发完成包，则浪费服务器资源
+    * 解决方法：为了防止恶意连接，accpetEx不接收用户数据，只接收地址（没办法，接口调用必须提供缓冲区）
+    */
+    static BYTE addrBuf[DOUBLE_ACCEPT_ADDRS_SIZE];
     if (FALSE == lpfnAcceptEx(m_pListenCtx->m_socket, pAcceptIoCtx->m_acceptSocket,
-        pBuf, nLen, sizeof(SOCKADDR) + 16, sizeof(SOCKADDR) + 16,
+        addrBuf, 0, ACCEPT_ADDRS_SIZE, ACCEPT_ADDRS_SIZE,
         &dwRecvByte, pOverlapped))
     {
         if (WSA_IO_PENDING != WSAGetLastError())
@@ -545,33 +556,32 @@ bool IocpServer::handleAccept(LPOVERLAPPED lpOverlapped, DWORD dwBytesTransferre
     }
     InterlockedIncrement(&m_nConnClientCnt);
 
-    LPFN_GETACCEPTEXSOCKADDRS lpfnGetAcceptExAddr = (LPFN_GETACCEPTEXSOCKADDRS)m_lpfnGetAcceptExAddr;
-    char* pBuf = pAcceptIoCtx->m_wsaBuf.buf;
-    ULONG nLen = pAcceptIoCtx->m_wsaBuf.len - ACCEPT_ADDRS_SIZE;
-    LPSOCKADDR_IN localAddr = nullptr;
-    LPSOCKADDR_IN peerAddr = nullptr;
-    int localAddrLen = sizeof(SOCKADDR_IN);
-    int peerAddrLen = sizeof(SOCKADDR_IN);
+    //LPFN_GETACCEPTEXSOCKADDRS lpfnGetAcceptExAddr = (LPFN_GETACCEPTEXSOCKADDRS)m_lpfnGetAcceptExAddr;
+    //char* pBuf = pAcceptIoCtx->m_wsaBuf.buf;
+    //ULONG nLen = pAcceptIoCtx->m_wsaBuf.len - ACCEPT_ADDRS_SIZE;
+    //LPSOCKADDR_IN localAddr = nullptr;
+    //LPSOCKADDR_IN peerAddr = nullptr;
+    //int localAddrLen = sizeof(SOCKADDR_IN);
+    //int peerAddrLen = sizeof(SOCKADDR_IN);
 
-    lpfnGetAcceptExAddr(pBuf, nLen, localAddrLen + 16,
-        peerAddrLen + 16, (LPSOCKADDR*)&localAddr, &localAddrLen,
-        (LPSOCKADDR*)&peerAddr, &peerAddrLen);
+    //lpfnGetAcceptExAddr(pBuf, nLen, ACCEPT_ADDRS_SIZE,
+    //    ACCEPT_ADDRS_SIZE, (LPSOCKADDR*)&localAddr, &localAddrLen,
+    //    (LPSOCKADDR*)&peerAddr, &peerAddrLen);
 
-    char localAddrBuf[1024] = { 0 };
-    inet_ntop(AF_INET, &localAddr->sin_addr, localAddrBuf, 1024);
-    char peerAddrBuf[1024] = { 0 };
-    inet_ntop(AF_INET, &peerAddr->sin_addr, peerAddrBuf, 1024);
+    //char localAddrBuf[1024] = { 0 };
+    //inet_ntop(AF_INET, &localAddr->sin_addr, localAddrBuf, 1024);
+    //char peerAddrBuf[1024] = { 0 };
+    //inet_ntop(AF_INET, &peerAddr->sin_addr, peerAddrBuf, 1024);
     //cout << "local address: " << inet_ntoa(localAddr->sin_addr) << ":" << ntohs(localAddr->sin_port) << "\t"
     //    << "peer address: " << inet_ntoa(peerAddr->sin_addr) << ":" << ntohs(peerAddr->sin_port) << endl;
-    cout << "local address: " << localAddrBuf << ":" << ntohs(localAddr->sin_port) << "-->"
-        << "peer address: " << peerAddrBuf << ":" << ntohs(peerAddr->sin_port) << endl;
+    //cout << "local address: " << localAddrBuf << ":" << ntohs(localAddr->sin_port) << "-->"
+    //    << "peer address: " << peerAddrBuf << ":" << ntohs(peerAddr->sin_port) << endl;
 
-    m_freeClientList.begin();
 
-    //创建新的ClientContext来保存新的连接socket，原来的IoContext要用来接收新的连接
-    //ClientContext* pConnClient = new ClientContext(pAcceptIoCtx->m_acceptSocket);
+    //创建新的ClientContext，原来的IoContext要用来接收新的连接
+    //ClientContext刚创建，在此函数不需要加锁
     ClientContext* pConnClient = allocateClientContext(pAcceptIoCtx->m_acceptSocket);
-    memcpy_s(&pConnClient->m_addr, peerAddrLen, peerAddr, peerAddrLen);
+    //memcpy_s(&pConnClient->m_addr, peerAddrLen, peerAddr, peerAddrLen);
 
     if (NULL == associateWithCompletionPort(pConnClient->m_socket, (ULONG_PTR)pConnClient))
     {
@@ -580,26 +590,19 @@ bool IocpServer::handleAccept(LPOVERLAPPED lpOverlapped, DWORD dwBytesTransferre
 
     enterIoLoop(pConnClient);
 
-
-
     ////开启心跳机制
     //setKeepAlive(pConnClient->m_socket, pIoCtx);
 
-    pConnClient->appendToBuffer((PBYTE)pBuf, dwBytesTransferred);
+    //pConnClient->appendToBuffer((PBYTE)pBuf, dwBytesTransferred);
 
     //投递一个新的accpet请求
     postAccept(pAcceptIoCtx);
 
     notifyNewConnection(pConnClient);
-    notifyPackageReceived(pConnClient);
+    //notifyPackageReceived(pConnClient);
 
     //将客户端加入连接列表
     addClient(pConnClient);
-
-    //解数据包
-    //pConnClient->decodePacket();
-
-    //echo(pConnClient);
 
     //投递recv请求,这里invalid socket是否要关闭客户端？
     PostResult result = postRecv(pConnClient);
@@ -617,19 +620,9 @@ bool IocpServer::handleRecv(ULONG_PTR lpCompletionKey, LPOVERLAPPED lpOverlapped
     ClientContext* pConnClient = (ClientContext*)lpCompletionKey;
     RecvIoContext* pRecvIoCtx = (RecvIoContext*)lpOverlapped;
 
-    //加锁
     pConnClient->appendToBuffer(pRecvIoCtx->m_recvBuf, dwBytesTransferred);
 
     notifyPackageReceived(pConnClient);
-
-    //解数据包
-    //pConnClient->decodePacket();
-
-    ////投递send请求
-    //IoContext* pSendIoCtx = pConnClient->getIoContext(PostType::SEND_EVENT);
-    //postSend(pSendIoCtx);
-
-    //echo(pConnClient);
 
     //投递recv请求
     PostResult result = postRecv(pConnClient);
@@ -703,7 +696,7 @@ int IocpServer::exitIoLoop(ClientContext* pClientCtx)
 void IocpServer::CloseClient(ClientContext* pConnClient)
 {
     SOCKET s;
-    SOCKADDR_IN peerAddr;
+    Addr peerAddr;
 
     {
         LockGuard lk(&pConnClient->m_csLock);
@@ -793,32 +786,25 @@ void IocpServer::releaseClientContext(ClientContext* pConnClient)
 
 void IocpServer::echo(ClientContext* pConnClient)
 {
-    //IoContext* pSendIoCtx = pConnClient->m_sendIoCtx;
-    //RecvIoContext* pRecvIoCtx = pConnClient->m_recvIoCtx;
-    //assert(nullptr != pRecvIoCtx);
-
-    //pConnClient->m_outBuf.copy(pConnClient->m_inBuf);
-    //pSendIoCtx->m_wsaBuf.buf = (PCHAR)pConnClient->m_outBuf.getBuffer(0);
-    //pSendIoCtx->m_wsaBuf.len = pConnClient->m_outBuf.getBufferLen();
-
-    //pConnClient->m_inBuf.remove(pConnClient->m_inBuf.getBufferLen());
-
-    //postSend(pConnClient);
-
-
     send(pConnClient, pConnClient->m_inBuf.getBuffer(), pConnClient->m_inBuf.getBufferLen());
+    pConnClient->m_inBuf.remove(pConnClient->m_inBuf.getBufferLen());
 }
 
-void IocpServer::notifyNewConnection(ClientContext * pConnClient)
+void IocpServer::notifyNewConnection(ClientContext* pConnClient)
 {
+    SOCKADDR_IN sockaddr = Net::getpeername(pConnClient->m_socket);
+    pConnClient->m_addr = sockaddr;
+    cout << "connected client: " << pConnClient->m_addr.toString() << ", fd: " << pConnClient->m_socket << endl;
 }
 
-void IocpServer::notifyDisconnected(SOCKET s, SOCKADDR_IN addr)
+void IocpServer::notifyDisconnected(SOCKET s, Addr addr)
 {
+    cout << "closed client " << addr.toString() << ", fd: " << s << endl;
 }
 
 void IocpServer::notifyPackageReceived(ClientContext* pConnClient)
 {
+    echo(pConnClient);
 }
 
 void IocpServer::notifyWritePackage()

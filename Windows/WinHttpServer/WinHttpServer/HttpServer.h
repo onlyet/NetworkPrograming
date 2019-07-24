@@ -11,7 +11,7 @@ public:
 
 protected:
     void notifyPackageReceived(ClientContext* pConnClient) override;
-    void notifyDisconnected(SOCKET s, SOCKADDR_IN addr) override;
+    //void notifyDisconnected(SOCKET s, Addr addr) override;
 
 
 };

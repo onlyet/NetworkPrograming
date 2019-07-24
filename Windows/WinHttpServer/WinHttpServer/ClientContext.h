@@ -4,6 +4,7 @@
 #include "Global.h"
 #include "Buffer.h"
 #include "Codec.h"
+#include "Addr.h"
 #include <string>
 #include <map>
 #include <algorithm>
@@ -32,7 +33,8 @@ struct ClientContext
     void appendToBuffer(const std::string& inBuf);
 
     SOCKET                              m_socket;           //客户端socket
-    SOCKADDR_IN                         m_addr;             //客户端地址
+    //SOCKADDR_IN                         m_addr;             //客户端地址
+    Addr                                m_addr;
     ULONG                               m_nPendingIoCnt;    //Avoids Access Violation，该值为0时才能释放ClientContext
     RecvIoContext*                      m_recvIoCtx;
     IoContext*                          m_sendIoCtx;

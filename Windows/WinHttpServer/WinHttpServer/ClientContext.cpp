@@ -7,6 +7,9 @@
 #include "Buffer.h"
 #include "LockGuard.h"
 
+#include <iostream>
+
+using namespace std;
 
 ListenContext::ListenContext(short port, const std::string& ip)
 {
@@ -28,6 +31,7 @@ ClientContext::ClientContext(const SOCKET& socket) :
 {
     SecureZeroMemory(&m_addr, sizeof(SOCKADDR_IN));
     InitializeCriticalSection(&m_csLock);
+    //cout << "socket: " << m_socket << ", lock: " << (int)&m_csLock << endl;
 }
 
 ClientContext::~ClientContext()

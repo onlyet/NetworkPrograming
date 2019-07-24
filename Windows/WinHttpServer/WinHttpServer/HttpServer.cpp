@@ -35,10 +35,6 @@ void HttpServer::notifyPackageReceived(ClientContext* pConnClient)
     }
 }
 
-void HttpServer::notifyDisconnected(SOCKET s, SOCKADDR_IN addr)
-{
-    char peerAddrBuf[1024] = { 0 };
-    inet_ntop(AF_INET, &addr.sin_addr, peerAddrBuf, 1024);
-    cout << "closed client " << peerAddrBuf << ":" << ntohs(addr.sin_port)
-        << ", fd: "<< s << endl;
-}
+//void HttpServer::notifyDisconnected(SOCKET s, Addr addr)
+//{
+//}
