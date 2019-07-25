@@ -11,8 +11,8 @@ using namespace std;
 int main()
 {
     {
-        IocpServer server(5001);
-        //HttpServer server(5001);
+        //IocpServer server(5001);
+        HttpServer server(5001);
         bool ret = server.start();
         if (!ret)
         {

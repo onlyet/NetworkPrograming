@@ -35,7 +35,7 @@ protected:
     HANDLE associateWithCompletionPort(SOCKET s, ULONG_PTR completionKey);
     bool getAcceptExPtr();
     bool getAcceptExSockaddrs();
-    bool setKeepAlive(SOCKET s, IoContext* pIoCtx, int time = 30, int interval = 10);
+    bool setKeepAlive(ClientContext* pConnClient, LPOVERLAPPED lpOverlapped, int time = 30, int interval = 10);
 
     bool createListenClient(short listenPort);
     bool createIocpWorker();

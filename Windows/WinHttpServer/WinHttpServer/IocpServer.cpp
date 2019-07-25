@@ -229,6 +229,7 @@ unsigned WINAPI IocpServer::IocpWorkerThread(LPVOID arg)
             //对端关闭
             if (0 == dwBytesTransferred)
             {
+                IoContext* pIoCtx = (IoContext*)lpOverlapped;
                 pThis->handleClose(lpCompletionKey);
                 continue;
             }
@@ -316,10 +317,13 @@ bool IocpServer::getAcceptExSockaddrs()
     return true;
 }
 
-bool IocpServer::setKeepAlive(SOCKET s, IoContext* pIoCtx, int time, int interval)
+bool IocpServer::setKeepAlive(ClientContext* pConnClient, LPOVERLAPPED lpOverlapped, int time, int interval)
 {
-    if (!Net::setKeepAlive(s, TRUE))
+    if (!Net::setKeepAlive(pConnClient->m_socket, TRUE))
         return false;
+
+    //LPWSAOVERLAPPED pOl = &pConnClient->m_recvIoCtx->m_overlapped;
+    LPWSAOVERLAPPED pOl = lpOverlapped;
 
     tcp_keepalive keepAlive;
     keepAlive.onoff = 1;
@@ -327,9 +331,9 @@ bool IocpServer::setKeepAlive(SOCKET s, IoContext* pIoCtx, int time, int interva
     keepAlive.keepaliveinterval = interval * 1000;    //间隔10秒
     DWORD dwBytes;
     //根据msdn这里要传一个OVERRLAP结构
-    int ret = WSAIoctl(s, SIO_KEEPALIVE_VALS,
+    int ret = WSAIoctl(pConnClient->m_socket, SIO_KEEPALIVE_VALS,
         &keepAlive, sizeof(tcp_keepalive), NULL, 0,
-        &dwBytes, &pIoCtx->m_overlapped, NULL);
+        &dwBytes, pOl, NULL);
     if (SOCKET_ERROR == ret && WSA_IO_PENDING != WSAGetLastError())
     {
         cout << "WSAIoctl failed with error: " << WSAGetLastError() << endl;
@@ -591,7 +595,7 @@ bool IocpServer::handleAccept(LPOVERLAPPED lpOverlapped, DWORD dwBytesTransferre
     enterIoLoop(pConnClient);
 
     ////开启心跳机制
-    //setKeepAlive(pConnClient->m_socket, pIoCtx);
+    setKeepAlive(pConnClient, &pAcceptIoCtx->m_overlapped);
 
     //pConnClient->appendToBuffer((PBYTE)pBuf, dwBytesTransferred);
 
