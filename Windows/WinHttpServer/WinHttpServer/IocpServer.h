@@ -13,8 +13,9 @@ struct ClientContext;
 
 class IocpServer
 {
-public:
+    friend class HbTimer;
 
+public:
     IocpServer(short listenPort, int maxConnectionCount = 10000);
     IocpServer(const IocpServer&) = delete;
     IocpServer& operator=(const IocpServer&) = delete;
@@ -35,7 +36,7 @@ protected:
     HANDLE associateWithCompletionPort(SOCKET s, ULONG_PTR completionKey);
     bool getAcceptExPtr();
     bool getAcceptExSockaddrs();
-    bool setKeepAlive(ClientContext* pConnClient, LPOVERLAPPED lpOverlapped, int time = 30, int interval = 10);
+    bool setKeepAlive(ClientContext* pConnClient, LPOVERLAPPED lpOverlapped, int time = 1, int interval = 1);
 
     bool createListenClient(short listenPort);
     bool createIocpWorker();
@@ -45,13 +46,11 @@ protected:
     bool postAccept(AcceptIoContext* pIoCtx);
     PostResult postRecv(ClientContext* pConnClient);
     PostResult postSend(ClientContext* pConnClient);
-    bool postParse(ClientContext* pConnClient, IoContext* pIoCtx);
 
     bool handleAccept(LPOVERLAPPED lpOverlapped, DWORD dwBytesTransferred);
     bool handleRecv(ULONG_PTR lpCompletionKey, LPOVERLAPPED lpOverlapped, DWORD dwBytesTransferred);
     bool handleSend(ULONG_PTR lpCompletionKey, LPOVERLAPPED lpOverlapped, DWORD dwBytesTransferred);
     bool handleClose(ULONG_PTR lpCompletionKey);
-
 
     // Used to avoid access violation.
     void enterIoLoop(ClientContext* pClientCtx);

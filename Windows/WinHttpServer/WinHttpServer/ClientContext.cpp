@@ -48,6 +48,7 @@ void ClientContext::reset()
     assert(0 == m_nPendingIoCnt);
     assert(m_outBufQueue.empty());
     SecureZeroMemory(&m_addr, sizeof(SOCKADDR_IN));
+    m_nLastHeartbeatTime = GetTickCount();
 }
 
 void ClientContext::appendToBuffer(PBYTE pInBuf, size_t len)

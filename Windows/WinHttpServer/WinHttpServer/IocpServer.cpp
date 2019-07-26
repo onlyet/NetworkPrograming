@@ -229,7 +229,6 @@ unsigned WINAPI IocpServer::IocpWorkerThread(LPVOID arg)
             //对端关闭
             if (0 == dwBytesTransferred)
             {
-                IoContext* pIoCtx = (IoContext*)lpOverlapped;
                 pThis->handleClose(lpCompletionKey);
                 continue;
             }
@@ -263,7 +262,6 @@ unsigned WINAPI IocpServer::IocpWorkerThread(LPVOID arg)
 HANDLE IocpServer::associateWithCompletionPort(SOCKET s, ULONG_PTR completionKey)
 {
     HANDLE hRet;
-    ClientContext* pClientCtx = (ClientContext*)completionKey;
     if (NULL == completionKey)
     {
         hRet = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
@@ -319,18 +317,19 @@ bool IocpServer::getAcceptExSockaddrs()
 
 bool IocpServer::setKeepAlive(ClientContext* pConnClient, LPOVERLAPPED lpOverlapped, int time, int interval)
 {
-    if (!Net::setKeepAlive(pConnClient->m_socket, TRUE))
+    if (!Net::setKeepAlive(pConnClient->m_socket, true))
         return false;
 
     //LPWSAOVERLAPPED pOl = &pConnClient->m_recvIoCtx->m_overlapped;
+    //LPWSAOVERLAPPED pOl = nullptr;
     LPWSAOVERLAPPED pOl = lpOverlapped;
 
     tcp_keepalive keepAlive;
     keepAlive.onoff = 1;
-    keepAlive.keepalivetime = time * 1000;        //30秒 
-    keepAlive.keepaliveinterval = interval * 1000;    //间隔10秒
+    keepAlive.keepalivetime = time * 1000;
+    keepAlive.keepaliveinterval = interval * 1000;
     DWORD dwBytes;
-    //根据msdn这里要传一个OVERRLAP结构
+    //根据msdn这里要传一个OVERLAPPED结构
     int ret = WSAIoctl(pConnClient->m_socket, SIO_KEEPALIVE_VALS,
         &keepAlive, sizeof(tcp_keepalive), NULL, 0,
         &dwBytes, pOl, NULL);
@@ -531,20 +530,6 @@ PostResult IocpServer::postSend(ClientContext* pConnClient)
     return result;
 }
 
-#if 0
-bool IocpServer::postParse(ClientContext* pConnClient, IoContext* pIoCtx)
-{
-    DWORD dwTransferred = pIoCtx->m_wsaBuf.len;
-    int ret = PostQueuedCompletionStatus(m_hComPort, dwTransferred, (ULONG_PTR)pConnClient, &pIoCtx->m_overlapped);
-    if (FALSE == ret)
-    {
-        cout << "PostQueuedCompletionStatus failed with error: " << WSAGetLastError() << endl;
-        return false;
-    }
-    return true;
-}
-#endif
-
 bool IocpServer::handleAccept(LPOVERLAPPED lpOverlapped, DWORD dwBytesTransferred)
 {
     AcceptIoContext* pAcceptIoCtx = (AcceptIoContext*)lpOverlapped;
@@ -594,8 +579,8 @@ bool IocpServer::handleAccept(LPOVERLAPPED lpOverlapped, DWORD dwBytesTransferre
 
     enterIoLoop(pConnClient);
 
-    ////开启心跳机制
-    setKeepAlive(pConnClient, &pAcceptIoCtx->m_overlapped);
+    //开启心跳机制
+    //setKeepAlive(pConnClient, &pAcceptIoCtx->m_overlapped);
 
     //pConnClient->appendToBuffer((PBYTE)pBuf, dwBytesTransferred);
 

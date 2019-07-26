@@ -3,7 +3,6 @@
 
 #include "Global.h"
 #include "Buffer.h"
-#include "Codec.h"
 #include "Addr.h"
 #include <string>
 #include <map>
@@ -38,11 +37,12 @@ struct ClientContext
     ULONG                               m_nPendingIoCnt;    //Avoids Access Violation，该值为0时才能释放ClientContext
     RecvIoContext*                      m_recvIoCtx;
     IoContext*                          m_sendIoCtx;
-    HttpCodec*                          m_pCodec;
     Buffer                              m_inBuf;
     Buffer                              m_outBuf;
     std::queue<Buffer>                  m_outBufQueue;
-    CRITICAL_SECTION                    m_csLock;           //加锁，保护socket，链表
+    CRITICAL_SECTION                    m_csLock;           //保护ClientContext
+
+    DWORD                               m_nLastHeartbeatTime;
 };
 
 #endif // !__CLIENT_CONTEXT_H__

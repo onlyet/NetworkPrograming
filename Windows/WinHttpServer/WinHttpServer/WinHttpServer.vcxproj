@@ -168,6 +168,7 @@
     <ClInclude Include="Net.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Slice.h" />
+    <ClInclude Include="Timer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Addr.cpp" />
@@ -189,6 +190,7 @@
     </ClCompile>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Slice.cpp" />
+    <ClCompile Include="Timer.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
